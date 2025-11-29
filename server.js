@@ -8,12 +8,9 @@ app.use(express.json());
 const PORT = process.env.PORT || 3000;
 
 // Conexión a MongoDB Atlas
-mongoose.connect(process.env.MONGO_URL, {
-  useNewUrlParser: true,
-  useUnifiedTopology: true
-})
-.then(() => console.log("✅ MongoDB Atlas conectado"))
-.catch(err => console.error("❌ Error al conectar:", err));
+mongoose.connect(process.env.MONGO_URL)
+  .then(() => console.log("✅ MongoDB Atlas conectado"))
+  .catch(err => console.error("❌ Error al conectar:", err));
 
 // Modelo de Usuario según tu colección
 const usuarioSchema = new mongoose.Schema({
