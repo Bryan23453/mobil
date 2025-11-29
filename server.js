@@ -7,7 +7,7 @@ app.use(express.json());
 
 const PORT = process.env.PORT || 3000;
 
-// Conexión a MongoDB Atlas
+// ---------------- CONEXIÓN A MONGODB ATLAS ----------------
 mongoose.connect(process.env.MONGO_URL)
   .then(() => console.log("✅ MongoDB Atlas conectado"))
   .catch(err => console.error("❌ Error al conectar:", err));
@@ -37,7 +37,7 @@ app.post('/usuarios', async (req, res) => {
   try {
     const nuevoUsuario = new Usuario(req.body);
     await nuevoUsuario.save();
-    res.json({ mensaje: 'Usuario agregado', usuario: nuevoUsuario });
+    res.status(201).json({ mensaje: 'Usuario agregado', usuario: nuevoUsuario });
   } catch (err) {
     console.error("Error al agregar usuario:", err);
     res.status(500).json({ mensaje: 'Error al agregar usuario', error: err.message });
@@ -48,33 +48,31 @@ app.post('/usuarios', async (req, res) => {
 const movimientoSchema = new mongoose.Schema({
   Fecha: { type: String, required: true },
   Vendedor: { type: String, required: true },
-  Tipo: { type: String, required: true },
-  Cantidad: { type: Number, required: true }
-});
+  Tipo: { type: String, enum: ['entrada', 'salida'], required: true },
+  Cantidad_bolsas: { type: Number, default: 0 },
+  Cantidad_botes: { type: Number, default: 0 }
+}, { collection: 'Salidas' }); // puedes renombrar la colección a "Movimientos" si quieres un solo lugar
 
-// Modelos separados
-const Entrada = mongoose.model('Entrada', movimientoSchema, 'Entradas');
-const Salida = mongoose.model('Salida', movimientoSchema, 'Salidas');
+const Salida = mongoose.model('Salida', movimientoSchema);
 
-
-// GET Salidas
+// GET todos los movimientos
 app.get('/salidas', async (req, res) => {
   try {
-    const salidas = await Salida.find();
-    res.json(salidas);
+    const movimientos = await Salida.find();
+    res.json(movimientos);
   } catch (err) {
-    res.status(500).json({ mensaje: 'Error al obtener salidas', error: err.message });
+    res.status(500).json({ mensaje: 'Error al obtener movimientos', error: err.message });
   }
 });
 
-// POST Salida
+// POST nuevo movimiento
 app.post('/salidas', async (req, res) => {
   try {
-    const nuevaSalida = new Salida(req.body);
-    await nuevaSalida.save();
-    res.json({ mensaje: 'Salida agregada', salida: nuevaSalida });
+    const nuevoMovimiento = new Salida(req.body);
+    await nuevoMovimiento.save();
+    res.status(201).json({ mensaje: 'Movimiento agregado', movimiento: nuevoMovimiento });
   } catch (err) {
-    res.status(500).json({ mensaje: 'Error al agregar salida', error: err.message });
+    res.status(500).json({ mensaje: 'Error al agregar movimiento', error: err.message });
   }
 });
 
