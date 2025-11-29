@@ -15,6 +15,17 @@ mongoose.connect(process.env.MONGO_URL)
 app.get("/", (req, res) => {
   res.send("Servidor corriendo!");
 });
+const Usuario = require('./Usuario'); // importar el modelo
 
+// Ruta para obtener todos los usuarios
+app.get('/usuarios', async (req, res) => {
+  try {
+    const usuarios = await Usuario.find(); // obtiene todos los usuarios
+    res.json(usuarios);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ mensaje: 'Error al obtener usuarios' });
+  }
+});
 // Inicia el servidor
 app.listen(PORT, () => console.log(`Servidor en puerto ${PORT}`));
