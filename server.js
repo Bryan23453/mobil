@@ -56,26 +56,6 @@ const movimientoSchema = new mongoose.Schema({
 const Entrada = mongoose.model('Entrada', movimientoSchema, 'Entradas');
 const Salida = mongoose.model('Salida', movimientoSchema, 'Salidas');
 
-// GET Entradas
-app.get('/entradas', async (req, res) => {
-  try {
-    const entradas = await Entrada.find();
-    res.json(entradas);
-  } catch (err) {
-    res.status(500).json({ mensaje: 'Error al obtener entradas', error: err.message });
-  }
-});
-
-// POST Entrada
-app.post('/entradas', async (req, res) => {
-  try {
-    const nuevaEntrada = new Entrada(req.body);
-    await nuevaEntrada.save();
-    res.json({ mensaje: 'Entrada agregada', entrada: nuevaEntrada });
-  } catch (err) {
-    res.status(500).json({ mensaje: 'Error al agregar entrada', error: err.message });
-  }
-});
 
 // GET Salidas
 app.get('/salidas', async (req, res) => {
