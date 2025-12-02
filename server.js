@@ -85,35 +85,99 @@ app.delete('/usuarios/:id', async (req, res) => {
   }
 });
 
+///////////////////////////movimientos////////////////////////////////////////////////////////////////////////////
 
-// entradas y salidas
+// Schema de movimientos 
 const movimientoSchema = new mongoose.Schema({
   Fecha: { type: String, required: true },
   Vendedor: { type: String, required: true },
   Tipo: { type: String, enum: ['entrada', 'salida'], required: true },
   Cantidad_bolsas: { type: Number, default: 0 },
-  Cantidad_botes: { type: Number, default: 0 }
-}, { collection: 'Salidas' });
-const Salida = mongoose.model('Salida', movimientoSchema);
+  Botes_vacios: { type: Number, default: 0 }, 
+  Botes_llenos: { type: Number, default: 0 } 
+}, { collection: 'Movimientos' });
 
-// GET todos las salidas
-app.get('/salidas', async (req, res) => {
+const Movimiento = mongoose.model('Movimiento', movimientoSchema);
+
+// ================= GET =================
+// Obtener todos los movimientos
+app.get('/movimientos', async (req, res) => {
   try {
-    const movimientos = await Salida.find();
+    const movimientos = await Movimiento.find();
     res.json(movimientos);
   } catch (err) {
     res.status(500).json({ mensaje: 'Error al obtener movimientos', error: err.message });
   }
 });
 
-// POST nuevo movimiento
-app.post('/salidas', async (req, res) => {
+// ================= POST =================
+// Agregar nuevo movimiento
+app.post('/movimientos', async (req, res) => {
   try {
-    const nuevoMovimiento = new Salida(req.body);
+    let { Fecha, Vendedor, Tipo, Cantidad_bolsas, Botes_vacios, Botes_llenos } = req.body;
+
+    if (Tipo === 'salida') {
+      Botes_vacios = 0; // siempre 0 en salidas
+    } else if (Tipo === 'entrada') {
+      Botes_vacios = Botes_vacios || 0;
+      Botes_llenos = Botes_llenos || 0;
+    }
+
+    const nuevoMovimiento = new Movimiento({
+      Fecha,
+      Vendedor,
+      Tipo,
+      Cantidad_bolsas,
+      Botes_vacios,
+      Botes_llenos
+    });
+
     await nuevoMovimiento.save();
     res.status(201).json({ mensaje: 'Movimiento agregado', movimiento: nuevoMovimiento });
   } catch (err) {
     res.status(500).json({ mensaje: 'Error al agregar movimiento', error: err.message });
+  }
+});
+
+// ================= PUT =================
+// Editar movimiento por ID
+app.put('/movimientos/:id', async (req, res) => {
+  try {
+    let { Fecha, Vendedor, Tipo, Cantidad_bolsas, Botes_vacios, Botes_llenos } = req.body;
+
+    if (Tipo === 'salida') {
+      Botes_vacios = 0;
+    }
+
+    const movimientoActualizado = await Movimiento.findByIdAndUpdate(
+      req.params.id,
+      { Fecha, Vendedor, Tipo, Cantidad_bolsas, Botes_vacios, Botes_llenos },
+      { new: true }
+    );
+
+    if (!movimientoActualizado) {
+      return res.status(404).json({ mensaje: 'Movimiento no encontrado' });
+    }
+
+    res.json({ mensaje: 'Movimiento actualizado', movimiento: movimientoActualizado });
+  } catch (err) {
+    res.status(500).json({ mensaje: 'Error al actualizar movimiento', error: err.message });
+  }
+});
+
+// ================= DELETE =================
+// Eliminar movimiento por ID
+app.delete('/movimientos/:id', async (req, res) => {
+  try {
+    const eliminado = await Movimiento.findByIdAndDelete(req.params.id);
+
+    if (!eliminado) {
+      return res.status(404).json({ mensaje: 'Movimiento no encontrado' });
+    }
+
+    res.json({ mensaje: 'Movimiento eliminado con éxito' });
+  } catch (err) {
+    res.status(500).json({ mensaje: 'Error al eliminar movimiento', error: err.message });
   }
 });
 
