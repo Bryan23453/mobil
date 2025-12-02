@@ -7,12 +7,12 @@ app.use(express.json());
 
 const PORT = process.env.PORT || 3000;
 
-// ---------------- CONEXIÓN A MONGODB ATLAS ----------------
+//pa entrar a mongo atlas
 mongoose.connect(process.env.MONGO_URL)
-  .then(() => console.log("✅ MongoDB Atlas conectado"))
-  .catch(err => console.error("❌ Error al conectar:", err));
+  .then(() => console.log("toy siiii"))
+  .catch(err => console.error("no toy soy mongolo ", err));
 
-// ---------------- USUARIOS ----------------
+// usuarios
 const usuarioSchema = new mongoose.Schema({
   usuario: { type: String, required: true },
   contrasena: { type: String, required: true },
@@ -43,19 +43,41 @@ app.post('/usuarios', async (req, res) => {
     res.status(500).json({ mensaje: 'Error al agregar usuario', error: err.message });
   }
 });
+// PUT editar usuario por ID
+app.put('/usuarios/:id', async (req, res) => {
+  try {
+    const usuarioActualizado = await Usuario.findByIdAndUpdate(
+      req.params.id,
+      req.body,
+      { new: true }
+    );
 
-// ---------------- ENTRADAS Y SALIDAS ----------------
+    if (!usuarioActualizado) {
+      return res.status(404).json({ mensaje: 'Usuario no encontrado' });
+    }
+
+    res.json({
+      mensaje: 'Usuario actualizado correctamente',
+      usuario: usuarioActualizado
+    });
+
+  } catch (err) {
+    console.error("Error al actualizar usuario:", err);
+    res.status(500).json({ mensaje: 'Error al actualizar usuario', error: err.message });
+  }
+});
+
+// entradas y salidas
 const movimientoSchema = new mongoose.Schema({
   Fecha: { type: String, required: true },
   Vendedor: { type: String, required: true },
   Tipo: { type: String, enum: ['entrada', 'salida'], required: true },
   Cantidad_bolsas: { type: Number, default: 0 },
   Cantidad_botes: { type: Number, default: 0 }
-}, { collection: 'Salidas' }); // puedes renombrar la colección a "Movimientos" si quieres un solo lugar
-
+}, { collection: 'Salidas' });
 const Salida = mongoose.model('Salida', movimientoSchema);
 
-// GET todos los movimientos
+// GET todos las salidas
 app.get('/salidas', async (req, res) => {
   try {
     const movimientos = await Salida.find();
@@ -76,5 +98,5 @@ app.post('/salidas', async (req, res) => {
   }
 });
 
-// ---------------- INICIAR SERVIDOR ----------------
+// ver si toy
 app.listen(PORT, () => console.log(`Servidor corriendo en puerto ${PORT}`));
