@@ -307,3 +307,28 @@ app.delete('/contabilidad/:id', async (req, res) => {
     res.status(500).json({ mensaje: 'Error al eliminar registro contable', error: err.message });
   }
 });
+// GET total de ingresos
+app.get('/contabilidad/ingresos', async (req, res) => {
+  try {
+    const totalIngresos = await Contabilidad.aggregate([
+      { $match: { tipo: 'Ingreso' } },
+      { $group: { _id: null, total: { $sum: '$monto' } } },
+    ]);
+    res.json({ total: totalIngresos[0]?.total || 0 });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET total de gastos
+app.get('/contabilidad/gastos', async (req, res) => {
+  try {
+    const totalGastos = await Contabilidad.aggregate([
+      { $match: { tipo: 'Gasto' } },
+      { $group: { _id: null, total: { $sum: '$monto' } } },
+    ]);
+    res.json({ total: totalGastos[0]?.total || 0 });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
