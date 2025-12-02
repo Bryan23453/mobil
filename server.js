@@ -236,3 +236,74 @@ app.delete("/productos/:id", async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
+
+/////////////////////////// contabilidad (ingresos y gastos) ///////////////////////////
+
+// Schema para contabilidad
+const contabilidadSchema = new mongoose.Schema({
+  descripcion: { type: String, required: true },
+  monto: { type: Number, required: true },
+  tipo: { type: String, enum: ['Ingreso', 'Gasto'], required: true },
+  fecha: { type: String, required: true }
+}, { collection: 'Contabilidad' });
+
+const Contabilidad = mongoose.model('Contabilidad', contabilidadSchema);
+
+// ---------------- GET todos los registros contables ----------------
+app.get('/contabilidad', async (req, res) => {
+  try {
+    const registros = await Contabilidad.find();
+    res.json(registros);
+  } catch (err) {
+    console.error("Error al obtener registros contables:", err);
+    res.status(500).json({ mensaje: 'Error al obtener registros contables', error: err.message });
+  }
+});
+
+// ---------------- POST nuevo registro contable ----------------
+app.post('/contabilidad', async (req, res) => {
+  try {
+    const { descripcion, monto, tipo, fecha } = req.body;
+    const nuevoRegistro = new Contabilidad({ descripcion, monto, tipo, fecha });
+    await nuevoRegistro.save();
+    res.status(201).json({ mensaje: 'Registro contable agregado', registro: nuevoRegistro });
+  } catch (err) {
+    console.error("Error al agregar registro contable:", err);
+    res.status(500).json({ mensaje: 'Error al agregar registro contable', error: err.message });
+  }
+});
+
+// ---------------- PUT editar registro contable ----------------
+app.put('/contabilidad/:id', async (req, res) => {
+  try {
+    const { descripcion, monto, tipo, fecha } = req.body;
+    const registroActualizado = await Contabilidad.findByIdAndUpdate(
+      req.params.id,
+      { descripcion, monto, tipo, fecha },
+      { new: true }
+    );
+
+    if (!registroActualizado) {
+      return res.status(404).json({ mensaje: 'Registro contable no encontrado' });
+    }
+
+    res.json({ mensaje: 'Registro contable actualizado', registro: registroActualizado });
+  } catch (err) {
+    console.error("Error al actualizar registro contable:", err);
+    res.status(500).json({ mensaje: 'Error al actualizar registro contable', error: err.message });
+  }
+});
+
+// ---------------- DELETE eliminar registro contable ----------------
+app.delete('/contabilidad/:id', async (req, res) => {
+  try {
+    const eliminado = await Contabilidad.findByIdAndDelete(req.params.id);
+    if (!eliminado) {
+      return res.status(404).json({ mensaje: 'Registro contable no encontrado' });
+    }
+    res.json({ mensaje: 'Registro contable eliminado con éxito' });
+  } catch (err) {
+    console.error("Error al eliminar registro contable:", err);
+    res.status(500).json({ mensaje: 'Error al eliminar registro contable', error: err.message });
+  }
+});
