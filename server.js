@@ -164,3 +164,75 @@ app.delete('/movimientos/:id', async (req, res) => {
 
 // ver si toy
 app.listen(PORT, () => console.log(`Servidor corriendo en puerto ${PORT}`));
+
+///////////////////////////productos/inventarios////////////////////////////////////////////////////////////////////////////
+// ------------------- Modelo -------------------
+const productoSchema = new mongoose.Schema({
+  nombre: { type: String, required: true },
+  cantidad: { type: Number, required: true },
+  precio: { type: Number, required: true },
+});
+
+const Producto = mongoose.model("Producto", productoSchema, "Inventario");
+
+// ------------------- Endpoints -------------------
+
+// Obtener todos los productos
+app.get("/productos", async (req, res) => {
+  try {
+    const productos = await Producto.find();
+    res.json(productos);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Obtener un producto por ID
+app.get("/productos/:id", async (req, res) => {
+  try {
+    const producto = await Producto.findById(req.params.id);
+    if (!producto) return res.status(404).json({ error: "Producto no encontrado" });
+    res.json(producto);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Crear un nuevo producto
+app.post("/productos", async (req, res) => {
+  try {
+    const { nombre, cantidad, precio } = req.body;
+    const nuevoProducto = new Producto({ nombre, cantidad, precio });
+    await nuevoProducto.save();
+    res.status(201).json(nuevoProducto);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// Actualizar un producto por ID
+app.put("/productos/:id", async (req, res) => {
+  try {
+    const { nombre, cantidad, precio } = req.body;
+    const productoActualizado = await Producto.findByIdAndUpdate(
+      req.params.id,
+      { nombre, cantidad, precio },
+      { new: true }
+    );
+    if (!productoActualizado) return res.status(404).json({ error: "Producto no encontrado" });
+    res.json(productoActualizado);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// Eliminar un producto por ID
+app.delete("/productos/:id", async (req, res) => {
+  try {
+    const productoEliminado = await Producto.findByIdAndDelete(req.params.id);
+    if (!productoEliminado) return res.status(404).json({ error: "Producto no encontrado" });
+    res.json({ mensaje: "Producto eliminado correctamente" });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
