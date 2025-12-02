@@ -32,6 +32,7 @@ app.get('/usuarios', async (req, res) => {
   }
 });
 
+
 // POST nuevo usuario
 app.post('/usuarios', async (req, res) => {
   try {
@@ -43,6 +44,7 @@ app.post('/usuarios', async (req, res) => {
     res.status(500).json({ mensaje: 'Error al agregar usuario', error: err.message });
   }
 });
+
 // PUT editar usuario por ID
 app.put('/usuarios/:id', async (req, res) => {
   try {
@@ -66,6 +68,22 @@ app.put('/usuarios/:id', async (req, res) => {
     res.status(500).json({ mensaje: 'Error al actualizar usuario', error: err.message });
   }
 });
+app.delete('/usuarios/:id', async (req, res) => {
+  try {
+    const eliminado = await Usuario.findByIdAndDelete(req.params.id);
+
+    if (!eliminado) {
+      return res.status(404).json({ mensaje: 'Usuario no encontrado' });
+    }
+
+    res.json({ mensaje: 'Usuario eliminado con éxito' });
+
+  } catch (err) {
+    console.error("Error al eliminar usuario:", err);
+    res.status(500).json({ mensaje: 'Error al eliminar usuario', error: err.message });
+  }
+});
+
 
 // entradas y salidas
 const movimientoSchema = new mongoose.Schema({
