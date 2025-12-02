@@ -14,6 +14,7 @@ mongoose.connect(process.env.MONGO_URL)
 
 // usuarios
 const usuarioSchema = new mongoose.Schema({
+  nombre: { type: String, required: true },  
   usuario: { type: String, required: true },
   contrasena: { type: String, required: true },
   rol: { type: String, required: true }
