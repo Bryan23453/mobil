@@ -332,3 +332,59 @@ app.get('/contabilidad/gastos', async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
+
+/////////////////////////// Botes prestados ///////////////////////////
+
+const botesPrestadosSchema = new mongoose.Schema({
+  vendedorId: { type: mongoose.Schema.Types.ObjectId, ref: "Usuario", required: true },
+  botes: { type: Number, required: true },
+  fecha: { type: Date, default: Date.now }
+});
+module.exports = mongoose.model("BotesPrestados", botesPrestadosSchema);
+// post botes
+app.post("/botes-prestados", async (req, res) => {
+  try {
+    const nuevo = new BotesPrestados({
+      vendedorId: req.body.vendedorId,
+      botes: req.body.botes,
+      fecha: req.body.fecha,
+    });
+
+    await nuevo.save();
+    res.json({ mensaje: "Registro agregado correctamente", data: nuevo });
+  } catch (error) {
+    res.status(500).json({ error: "Error al agregar el registro" });
+  }
+});
+
+//get con vendedor
+app.get("/botes-prestados/:vendedorId", async (req, res) => {
+  try {
+    const lista = await BotesPrestados.find({
+      vendedorId: req.params.vendedorId,
+    });
+
+    res.json(lista);
+  } catch (error) {
+    res.status(500).json({ error: "Error al obtener los datos" });
+  }
+});
+// get con fecha vendedor
+app.get("/botes-prestados/buscar", async (req, res) => {
+  try {
+    const { vendedorId, fecha } = req.query;
+
+    if (!vendedorId || !fecha) {
+      return res.status(400).json({ error: "Falta vendedorId o fecha" });
+    }
+
+    const resultado = await BotesPrestados.find({
+      vendedorId,
+      fecha,
+    });
+
+    res.json(resultado);
+  } catch (error) {
+    res.status(500).json({ error: "Error en la búsqueda" });
+  }
+});
