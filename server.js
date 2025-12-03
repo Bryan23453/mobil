@@ -336,12 +336,11 @@ app.get('/contabilidad/gastos', async (req, res) => {
 /////////////////////////// Botes prestados ///////////////////////////
 
 const botesPrestadosSchema = new mongoose.Schema({
-  vendedorId: { type: mongoose.Schema.Types.ObjectId, ref: "Usuario", required: true },
+  vendedorId: { type: String, required: true }, // <- solo guardamos el id como string
   botes: { type: Number, required: true },
   fecha: { type: Date, default: Date.now }
 });
 
-// Definimos el modelo y lo guardamos en una variable
 const BotesPrestados = mongoose.model("BotesPrestados", botesPrestadosSchema);
 
 // POST botes
@@ -360,7 +359,7 @@ app.post("/botes-prestados", async (req, res) => {
   }
 });
 
-// GET todos los vendedores con botes pendientes
+// GET todos los vendedores con botes pendientes (solo agrupa por vendedorId)
 app.get("/botes-prestados", async (req, res) => {
   try {
     const resultado = await BotesPrestados.aggregate([
@@ -371,19 +370,10 @@ app.get("/botes-prestados", async (req, res) => {
         }
       },
       {
-        $lookup: {
-          from: "usuarios",
-          localField: "_id",
-          foreignField: "_id",
-          as: "vendedorInfo"
-        }
-      },
-      { $unwind: "$vendedorInfo" },
-      {
         $project: {
           _id: 0,
           vendedorId: "$_id",
-          nombre: "$vendedorInfo.nombre",
+          nombre: "$_id", // si quieres mostrar algo en el título, por ahora usamos el id
           botesPendientes: 1
         }
       }
@@ -396,19 +386,26 @@ app.get("/botes-prestados", async (req, res) => {
   }
 });
 
-// GET historial por vendedor y fecha
+// GET historial por vendedor (y opcionalmente por fecha)
 app.get("/botes-prestados/buscar", async (req, res) => {
   try {
     const { vendedorId, fecha } = req.query;
-    if (!vendedorId || !fecha) {
-      return res.status(400).json({ error: "Falta vendedorId o fecha" });
+    if (!vendedorId) {
+      return res.status(400).json({ error: "Falta vendedorId" });
     }
 
-    const resultado = await BotesPrestados.find({
-      vendedorId,
-      fecha,
-    });
+    let filtro = { vendedorId };
 
+    if (fecha) {
+      // Convertimos fecha a rango del día completo
+      const inicio = new Date(fecha);
+      inicio.setHours(0, 0, 0, 0);
+      const fin = new Date(fecha);
+      fin.setHours(23, 59, 59, 999);
+      filtro.fecha = { $gte: inicio, $lte: fin };
+    }
+
+    const resultado = await BotesPrestados.find(filtro).sort({ fecha: -1 });
     res.json(resultado);
   } catch (error) {
     res.status(500).json({ error: "Error en la búsqueda" });
