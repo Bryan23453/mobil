@@ -340,8 +340,11 @@ const botesPrestadosSchema = new mongoose.Schema({
   botes: { type: Number, required: true },
   fecha: { type: Date, default: Date.now }
 });
-module.exports = mongoose.model("BotesPrestados", botesPrestadosSchema);
-// post botes
+
+// Definimos el modelo y lo guardamos en una variable
+const BotesPrestados = mongoose.model("BotesPrestados", botesPrestadosSchema);
+
+// POST botes
 app.post("/botes-prestados", async (req, res) => {
   try {
     const nuevo = new BotesPrestados({
@@ -357,32 +360,26 @@ app.post("/botes-prestados", async (req, res) => {
   }
 });
 
-/// GET: lista de todos los vendedores con botes pendientes
+// GET todos los vendedores con botes pendientes
 app.get("/botes-prestados", async (req, res) => {
   try {
     const resultado = await BotesPrestados.aggregate([
       {
-        // Agrupamos por vendedorId
         $group: {
           _id: "$vendedorId",
           botesPendientes: { $sum: "$botes" }
         }
       },
       {
-        // Hacemos lookup para traer los datos del vendedor desde la colección Usuario
         $lookup: {
-          from: "usuarios", // nombre de la colección de usuarios en tu DB
+          from: "usuarios",
           localField: "_id",
           foreignField: "_id",
           as: "vendedorInfo"
         }
       },
+      { $unwind: "$vendedorInfo" },
       {
-        // Desenrollamos el array
-        $unwind: "$vendedorInfo"
-      },
-      {
-        // Proyectamos la forma final que queremos
         $project: {
           _id: 0,
           vendedorId: "$_id",
@@ -399,11 +396,10 @@ app.get("/botes-prestados", async (req, res) => {
   }
 });
 
-// get con fecha vendedor
+// GET historial por vendedor y fecha
 app.get("/botes-prestados/buscar", async (req, res) => {
   try {
     const { vendedorId, fecha } = req.query;
-
     if (!vendedorId || !fecha) {
       return res.status(400).json({ error: "Falta vendedorId o fecha" });
     }
