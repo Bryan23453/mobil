@@ -357,18 +357,48 @@ app.post("/botes-prestados", async (req, res) => {
   }
 });
 
-//get con vendedor
-app.get("/botes-prestados/:vendedorId", async (req, res) => {
+/// GET: lista de todos los vendedores con botes pendientes
+app.get("/botes-prestados", async (req, res) => {
   try {
-    const lista = await BotesPrestados.find({
-      vendedorId: req.params.vendedorId,
-    });
+    const resultado = await BotesPrestados.aggregate([
+      {
+        // Agrupamos por vendedorId
+        $group: {
+          _id: "$vendedorId",
+          botesPendientes: { $sum: "$botes" }
+        }
+      },
+      {
+        // Hacemos lookup para traer los datos del vendedor desde la colección Usuario
+        $lookup: {
+          from: "usuarios", // nombre de la colección de usuarios en tu DB
+          localField: "_id",
+          foreignField: "_id",
+          as: "vendedorInfo"
+        }
+      },
+      {
+        // Desenrollamos el array
+        $unwind: "$vendedorInfo"
+      },
+      {
+        // Proyectamos la forma final que queremos
+        $project: {
+          _id: 0,
+          vendedorId: "$_id",
+          nombre: "$vendedorInfo.nombre",
+          botesPendientes: 1
+        }
+      }
+    ]);
 
-    res.json(lista);
+    res.json(resultado);
   } catch (error) {
-    res.status(500).json({ error: "Error al obtener los datos" });
+    console.error(error);
+    res.status(500).json({ error: "Error al obtener los vendedores con botes pendientes" });
   }
 });
+
 // get con fecha vendedor
 app.get("/botes-prestados/buscar", async (req, res) => {
   try {
