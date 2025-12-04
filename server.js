@@ -361,7 +361,7 @@ app.post("/botes-prestados", async (req, res) => {
 
 
 // GET todos los vendedores con botes pendientes (solo agrupa por vendedorId)
-aapp.get("/botes-prestados", async (req, res) => {
+app.get("/botes-prestados", async (req, res) => {
   try {
     const resultado = await BotesPrestados.aggregate([
       {
