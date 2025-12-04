@@ -410,27 +410,24 @@ const Factura = mongoose.model("Factura", facturaSchema);
 
 
 // GET /facturas?tipo=&estado=&fecha=
+// Backend: GET /facturas?tipo=&estado=&fecha=
 app.get("/facturas", async (req, res) => {
   try {
     const { tipo, estado, fecha } = req.query;
-
     let filtro = {};
 
-    // Filtrar por tipo si no es "Todos"
-    if (tipo && tipo !== "Todos") {
-      filtro.tipo = tipo;
-    }
+    if (tipo && tipo !== "Todos") filtro.tipo = tipo;
+    if (estado && estado !== "Todos") filtro.estado = estado;
 
-    // Filtrar por estado si no es "Todos"
-    if (estado && estado !== "Todos") {
-      filtro.estado = estado;
-    }
-
-    // Filtrar por fecha si se proporciona
     if (fecha) {
-      // Convertimos de "YYYY-MM-DD" a "YYYY/MM/DD" para coincidir con tu DB
-      const partes = fecha.split("-");
-      filtro.fecha = `${partes[0]}/${int.parse(partes[1])}/${int.parse(partes[2])}`;
+      // Convertimos la fecha de string a Date
+      const fechaObj = new Date(fecha);
+
+      // Creamos un rango: desde el inicio del día hasta el final
+      const inicio = new Date(fechaObj.setHours(0,0,0,0));
+      const fin = new Date(fechaObj.setHours(23,59,59,999));
+
+      filtro.fecha = { $gte: inicio, $lte: fin };
     }
 
     const facturas = await Factura.find(filtro).sort({ fecha: -1 });
