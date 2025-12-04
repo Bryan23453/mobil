@@ -343,7 +343,7 @@ const botesPrestadosSchema = new mongoose.Schema({
 });
 
 
-const BotesPrestados = mongoose.model("Botes_prestados", botesPrestadosSchema);
+const BotesPrestados = mongoose.model("Botes_prestados", botesPrestadosSchema, "Botes_prestados");
 
 // POST botes
 app.post("/botes-prestados", async (req, res) => {
