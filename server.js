@@ -360,32 +360,22 @@ app.post("/botes-prestados", async (req, res) => {
 });
 
 
-// GET todos los vendedores con botes pendientes (solo agrupa por vendedorId)
+
+// GET todos los vendedores con botes pendientes
 app.get("/botes-prestados", async (req, res) => {
   try {
     const resultado = await BotesPrestados.aggregate([
       {
         $group: {
-          _id: "$vendedorId",
-          botesPendientes: { $sum: "$botes" }
+          _id: { vendedorId: "$vendedorId", nombre: "$nombre" },
+          botesPendientes: { $sum: "$botesPendientes" }
         }
-      },
-      {
-        $lookup: {
-          from: "vendedores",
-          localField: "_id",
-          foreignField: "_id",
-          as: "vendedor"
-        }
-      },
-      {
-        $unwind: "$vendedor"
       },
       {
         $project: {
-          _id: 1,
-          vendedorId: "$_id",
-          nombre: "$vendedor.nombre",
+          _id: 0,
+          vendedorId: "$_id.vendedorId",
+          nombre: "$_id.nombre",
           botesPendientes: 1
         }
       }
