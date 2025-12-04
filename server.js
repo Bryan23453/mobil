@@ -437,3 +437,83 @@ app.get("/facturas", async (req, res) => {
     res.status(500).json({ error: "Error al obtener facturas" });
   }
 });
+////////////////////////// FACTURAS NUEVOS ENDPOINTS ///////////////////////////
+
+// POST /facturas/generar
+// Body: { "vendedor": "Juan Pérez", "tipo": "Vendedor", "fecha": "2025-12-01" }
+app.post("/facturas/generar", async (req, res) => {
+  try {
+    const { vendedor, tipo, fecha } = req.body;
+
+    if (!vendedor || !tipo || !fecha) {
+      return res.status(400).json({ mensaje: "Faltan campos obligatorios" });
+    }
+
+    const fechaObj = new Date(fecha);
+    const inicio = new Date(fechaObj.setHours(0,0,0,0));
+    const fin = new Date(fechaObj.setHours(23,59,59,999));
+
+    // Obtener todos los movimientos del vendedor en ese día
+    const movimientos = await Movimiento.find({
+      Vendedor: vendedor,
+      Fecha: { $gte: inicio, $lte: fin }
+    });
+
+    if (movimientos.length === 0) {
+      return res.status(404).json({ mensaje: "No hay movimientos para esta fecha" });
+    }
+
+    // Generar resumen de productos
+    let totalBotesLlenos = 0;
+    let totalBotesVacios = 0;
+    let totalBolsas = 0;
+
+    movimientos.forEach(m => {
+      totalBotesLlenos += m.Cantidad_botes_llenos || 0;
+      totalBotesVacios += m.Cantidad_botes_vacios || 0;
+      totalBolsas += m.Cantidad_bolsas || 0;
+    });
+
+    const productos = [];
+    if (totalBotesLlenos > 0) productos.push({ nombre: "Botellón", cantidad: totalBotesLlenos, precio: 120 });
+    if (totalBolsas > 0) productos.push({ nombre: "Bolsa", cantidad: totalBolsas, precio: 45 });
+
+    // Crear factura
+    const nuevaFactura = new Factura({
+      vendedor,
+      tipo,
+      fecha: inicio,
+      productos,
+      estado: "Pendiente"
+    });
+
+    await nuevaFactura.save();
+    res.status(201).json({ mensaje: "Factura generada correctamente", factura: nuevaFactura });
+
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ mensaje: "Error al generar factura", error: error.message });
+  }
+});
+
+// GET /facturas/dia?fecha=YYYY-MM-DD
+app.get("/facturas/dia", async (req, res) => {
+  try {
+    const { fecha } = req.query;
+    if (!fecha) return res.status(400).json({ mensaje: "Debe enviar la fecha" });
+
+    const fechaObj = new Date(fecha);
+    const inicio = new Date(fechaObj.setHours(0,0,0,0));
+    const fin = new Date(fechaObj.setHours(23,59,59,999));
+
+    const facturas = await Factura.find({
+      fecha: { $gte: inicio, $lte: fin }
+    });
+
+    res.json(facturas);
+
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ mensaje: "Error al obtener facturas", error: error.message });
+  }
+});
