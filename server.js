@@ -371,7 +371,7 @@ app.get("/botes-prestados", async (req, res) => {
       {
         $group: {
           _id: { vendedorId: "$vendedorId", nombre: "$nombre" },
-          botesPendientes: { $sum: { $toInt: "$botesPendientes" } } // suma todos los registros
+          botesPendientes: { $sum: "$botesPendientes" } // ya no usamos $toInt
         }
       },
       {
@@ -390,6 +390,7 @@ app.get("/botes-prestados", async (req, res) => {
     res.status(500).json({ error: "Error al obtener los vendedores con botes pendientes" });
   }
 });
+
 
 
 
