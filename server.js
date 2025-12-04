@@ -336,10 +336,12 @@ app.get('/contabilidad/gastos', async (req, res) => {
 /////////////////////////// Botes prestados ///////////////////////////
 
 const botesPrestadosSchema = new mongoose.Schema({
-  vendedorId: { type: String, required: true }, // <- solo guardamos el id como string
-  botes: { type: Number, required: true },
-  fecha: { type: Date, default: Date.now }
+  vendedorId: { type: String, required: true }, // guardamos el id como string
+  nombre: { type: String, required: true },     // nombre del vendedor
+  botesPendientes: { type: Number, required: true }, // cantidad de botes
+  fecha: { type: Date, default: Date.now }      // fecha del registro
 });
+
 
 const BotesPrestados = mongoose.model("BotesPrestados", botesPrestadosSchema);
 
