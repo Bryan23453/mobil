@@ -391,30 +391,52 @@ app.get("/botes-prestados", async (req, res) => {
   }
 });
 
+/////////////////////////// Facturaaaaaaaa ///////////////////////////
+const facturaSchema = new mongoose.Schema({
+  vendedor: { type: String, required: true },
+  tipo: { type: String, required: true }, // "Vendedor" o "Directa"
+  fecha: { type: String, required: true }, // "YYYY/MM/DD"
+  productos: [
+    {
+      nombre: { type: String, required: true },
+      cantidad: { type: Number, required: true },
+      precio: { type: Number, required: true }
+    }
+  ],
+  estado: { type: String, required: true } // "Pagada" o "Pendiente"
+}, { collection: "Facturas" });
+
+const Factura = mongoose.model("Factura", facturaSchema);
 
 
-app.get("/botes-prestados/buscar", async (req, res) => {
+// GET /facturas?tipo=&estado=&fecha=
+app.get("/facturas", async (req, res) => {
   try {
-    const { vendedorId, fecha } = req.query;
-    if (!vendedorId) {
-      return res.status(400).json({ error: "Falta vendedorId" });
+    const { tipo, estado, fecha } = req.query;
+
+    let filtro = {};
+
+    // Filtrar por tipo si no es "Todos"
+    if (tipo && tipo !== "Todos") {
+      filtro.tipo = tipo;
     }
 
-    let filtro = { vendedorId };
+    // Filtrar por estado si no es "Todos"
+    if (estado && estado !== "Todos") {
+      filtro.estado = estado;
+    }
 
+    // Filtrar por fecha si se proporciona
     if (fecha) {
-      // Convertimos fecha a formato dd/mm/yyyy para comparar strings
-      // Ejemplo: "2025-12-03" -> "03/12/2025"
-      const partes = fecha.split("-"); // "2025-12-03"
-      const fechaFormateada = `${partes[2]}/${partes[1]}/${partes[0]}`;
-
-      filtro.fecha = fechaFormateada;
+      // Convertimos de "YYYY-MM-DD" a "YYYY/MM/DD" para coincidir con tu DB
+      const partes = fecha.split("-");
+      filtro.fecha = `${partes[0]}/${int.parse(partes[1])}/${int.parse(partes[2])}`;
     }
 
-    const resultado = await BotesPrestados.find(filtro).sort({ fecha: -1 });
-    res.json(resultado);
+    const facturas = await Factura.find(filtro).sort({ fecha: -1 });
+    res.json(facturas);
   } catch (error) {
     console.error(error);
-    res.status(500).json({ error: "Error en la búsqueda" });
+    res.status(500).json({ error: "Error al obtener facturas" });
   }
 });
