@@ -359,8 +359,9 @@ app.post("/botes-prestados", async (req, res) => {
   }
 });
 
+
 // GET todos los vendedores con botes pendientes (solo agrupa por vendedorId)
-app.get("/botes-prestados", async (req, res) => {
+aapp.get("/botes-prestados", async (req, res) => {
   try {
     const resultado = await BotesPrestados.aggregate([
       {
@@ -370,10 +371,21 @@ app.get("/botes-prestados", async (req, res) => {
         }
       },
       {
+        $lookup: {
+          from: "vendedores",
+          localField: "_id",
+          foreignField: "_id",
+          as: "vendedor"
+        }
+      },
+      {
+        $unwind: "$vendedor"
+      },
+      {
         $project: {
-          _id: 0,
+          _id: 1,
           vendedorId: "$_id",
-          nombre: "$_id", // si quieres mostrar algo en el título, por ahora usamos el id
+          nombre: "$vendedor.nombre",
           botesPendientes: 1
         }
       }
@@ -386,6 +398,7 @@ app.get("/botes-prestados", async (req, res) => {
   }
 });
 
+
 // GET historial por vendedor (y opcionalmente por fecha)
 app.get("/botes-prestados/buscar", async (req, res) => {
   try {
@@ -397,11 +410,12 @@ app.get("/botes-prestados/buscar", async (req, res) => {
     let filtro = { vendedorId };
 
     if (fecha) {
-      // Convertimos fecha a rango del día completo
       const inicio = new Date(fecha);
       inicio.setHours(0, 0, 0, 0);
+
       const fin = new Date(fecha);
       fin.setHours(23, 59, 59, 999);
+
       filtro.fecha = { $gte: inicio, $lte: fin };
     }
 
