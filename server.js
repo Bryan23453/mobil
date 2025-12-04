@@ -395,7 +395,7 @@ app.get("/botes-prestados", async (req, res) => {
 const facturaSchema = new mongoose.Schema({
   vendedor: { type: String, required: true },
   tipo: { type: String, required: true }, // "Vendedor" o "Directa"
-  fecha: { type: String, required: true }, // "YYYY/MM/DD"
+  fecha: { type: Date, required: true },
   productos: [
     {
       nombre: { type: String, required: true },
