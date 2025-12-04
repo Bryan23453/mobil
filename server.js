@@ -393,8 +393,6 @@ app.get("/botes-prestados", async (req, res) => {
 
 
 
-
-// GET historial por vendedor (y opcionalmente por fecha)
 app.get("/botes-prestados/buscar", async (req, res) => {
   try {
     const { vendedorId, fecha } = req.query;
@@ -405,18 +403,18 @@ app.get("/botes-prestados/buscar", async (req, res) => {
     let filtro = { vendedorId };
 
     if (fecha) {
-      const inicio = new Date(fecha);
-      inicio.setHours(0, 0, 0, 0);
+      // Convertimos fecha a formato dd/mm/yyyy para comparar strings
+      // Ejemplo: "2025-12-03" -> "03/12/2025"
+      const partes = fecha.split("-"); // "2025-12-03"
+      const fechaFormateada = `${partes[2]}/${partes[1]}/${partes[0]}`;
 
-      const fin = new Date(fecha);
-      fin.setHours(23, 59, 59, 999);
-
-      filtro.fecha = { $gte: inicio, $lte: fin };
+      filtro.fecha = fechaFormateada;
     }
 
     const resultado = await BotesPrestados.find(filtro).sort({ fecha: -1 });
     res.json(resultado);
   } catch (error) {
+    console.error(error);
     res.status(500).json({ error: "Error en la búsqueda" });
   }
 });
