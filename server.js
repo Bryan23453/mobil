@@ -560,3 +560,21 @@ app.get("/facturas/preview", async (req, res) => {
     res.status(500).json({ mensaje: "Error al generar preview", error: error.message });
   }
 });
+app.put("/facturas/pagar", async (req, res) => {
+  const { vendedor, fecha } = req.body;
+
+  try {
+    const result = await Factura.updateMany(
+      { vendedor, fecha, estado: "Pendiente" },
+      { $set: { estado: "Pagada" } }
+    );
+
+    if (result.modifiedCount > 0) {
+      res.status(200).json({ message: "Factura(s) pagada(s)" });
+    } else {
+      res.status(404).json({ message: "No se encontraron facturas pendientes" });
+    }
+  } catch (error) {
+    res.status(500).json({ message: "Error al actualizar factura", error });
+  }
+});
