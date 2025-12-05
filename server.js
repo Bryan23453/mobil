@@ -653,3 +653,50 @@ app.put("/facturas/pagar", async (req, res) => {
     res.status(500).json({ message: "Error al actualizar factura", error });
   }
 });
+////////////////////////////precios/////////////////////////////////////
+const PreciosSchema = new mongoose.Schema({
+  botellon: { type: Number, required: true },
+  bolsa: { type: Number, required: true },
+  fechaActualizacion: { type: Date, default: Date.now }
+});
+
+module.exports = mongoose.model("Precios", PreciosSchema);
+const Precios = require("./models/Precios");
+
+// Obtener precios
+app.get("/precios", async (req, res) => {
+  try {
+    const precios = await Precios.findOne({});
+    if (!precios) {
+      return res.status(404).json({ mensaje: "No hay tabla de precios configurada" });
+    }
+    res.json(precios);
+  } catch (err) {
+    res.status(500).json({ mensaje: "Error al obtener precios", error: err.message });
+  }
+});
+
+// Actualizar precios
+app.put("/precios", async (req, res) => {
+  try {
+    const { botellon, bolsa } = req.body;
+
+    if (botellon == null || bolsa == null) {
+      return res.status(400).json({ mensaje: "Debe enviar botellon y bolsa" });
+    }
+
+    const precios = await Precios.findOneAndUpdate(
+      {},
+      {
+        botellon,
+        bolsa,
+        fechaActualizacion: new Date()
+      },
+      { new: true, upsert: true }
+    );
+
+    res.json({ mensaje: "Precios actualizados correctamente", precios });
+  } catch (err) {
+    res.status(500).json({ mensaje: "Error al actualizar precios", error: err.message });
+  }
+});
