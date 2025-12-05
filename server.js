@@ -456,7 +456,7 @@ app.post("/facturas/generar", async (req, res) => {
 
     const fechaStr = fecha.toString(); // "5/12/2025" por ejemplo
 
-    // 1) Intentar buscar movimientos por string tal cual (caso actual)
+    // 1) Intentar buscar movimientos por string tal cual
     let movimientos = await Movimiento.find({ Vendedor: vendedor, Fecha: fechaStr });
 
     // 2) Si no encuentra, intentar con ceros: "05/12/2025"
@@ -466,21 +466,18 @@ app.post("/facturas/generar", async (req, res) => {
       movimientos = await Movimiento.find({ Vendedor: vendedor, Fecha: fechaPad });
     }
 
-    // 3) Si sigue sin encontrar, intentar buscar por rango si los movimientos tienen fecha Date (no aplica si son strings)
+    // 3) Si sigue sin encontrar, intentar buscar por rango si los movimientos tienen fecha Date
     if (!movimientos || movimientos.length === 0) {
-      console.log("No se encontraron movimientos por string. Intentando fallback con consulta amplia.");
-      // Intentar buscar cualquier movimiento del vendedor en ese día usando parsing:
-      const [d,m,y] = fechaStr.split("/").map(Number);
+      const [d, m, y] = fechaStr.split("/").map(Number);
       if (d && m && y) {
         const inicio = new Date(y, m - 1, d);
         const fin = new Date(y, m - 1, d + 1);
         movimientos = await Movimiento.find({
           Vendedor: vendedor,
-          // if Fecha stored as string this won't match; si tienes algunos documentos con Date, usar:
           $or: [
             { Fecha: fechaStr },
-            { Fecha: fechaStr.split("/").map(s=>s.padStart(2,'0')).join("/") },
-            { Fecha: { $gte: inicio.toISOString(), $lt: fin.toISOString() } } // raro si es string
+            { Fecha: fechaStr.split("/").map(s => s.padStart(2, '0')).join("/") },
+            { Fecha: { $gte: inicio.toISOString(), $lt: fin.toISOString() } }
           ]
         });
       }
@@ -490,10 +487,9 @@ app.post("/facturas/generar", async (req, res) => {
       return res.status(404).json({ mensaje: "No hay movimientos para esta fecha" });
     }
 
-    // — resto del cálculo igual —
+    // — Cálculo de cantidades —
     let totalBotesCobrados = 0;
     let totalBolsasCobradas = 0;
-
     let botesLlenosEntregados = 0;
     let botesVaciosRegresados = 0;
     let botesLlenosRegresados = 0;
@@ -506,7 +502,6 @@ app.post("/facturas/generar", async (req, res) => {
         botesVaciosRegresados += m.Cantidad_botes_vacios || 0;
         botesLlenosRegresados += m.Cantidad_botes_llenos || 0;
       }
-
       if (m.Tipo === "salida") {
         totalBolsasCobradas += m.Cantidad_bolsas || 0;
         botesLlenosEntregados += m.Cantidad_botes_llenos || 0;
@@ -515,9 +510,19 @@ app.post("/facturas/generar", async (req, res) => {
 
     totalBolsasCobradas = Math.max(0, totalBolsasCobradas);
 
+    // --- TRAER PRECIOS REALES DE LA DB ---
+    const productosDB = await Producto.find(); // Asegúrate de que tu modelo se llame "Producto"
     const productos = [];
-    if (totalBotesCobrados > 0) productos.push({ nombre: "Botellón", cantidad: totalBotesCobrados, precio: 120 });
-    if (totalBolsasCobradas > 0) productos.push({ nombre: "Bolsa", cantidad: totalBolsasCobradas, precio: 45 });
+
+    if (totalBotesCobrados > 0) {
+      const precioBotellon = productosDB.find(p => p.nombre.toLowerCase() === "botellón")?.precio || 120;
+      productos.push({ nombre: "Botellón", cantidad: totalBotesCobrados, precio: precioBotellon });
+    }
+
+    if (totalBolsasCobradas > 0) {
+      const precioBolsa = productosDB.find(p => p.nombre.toLowerCase() === "bolsa")?.precio || 45;
+      productos.push({ nombre: "Bolsa", cantidad: totalBolsasCobradas, precio: precioBolsa });
+    }
 
     const total = productos.reduce((acc, p) => acc + (p.cantidad * p.precio), 0);
 
@@ -563,6 +568,7 @@ app.post("/facturas/generar", async (req, res) => {
     res.status(500).json({ mensaje: "Error al generar factura", error: error.message });
   }
 });
+
 
 
 
@@ -659,6 +665,7 @@ const PreciosSchema = new mongoose.Schema({
   bolsa: { type: Number, required: true },
   fechaActualizacion: { type: Date, default: Date.now }
 });
+
 
 const Precios = mongoose.model("Precios", PreciosSchema);
 
