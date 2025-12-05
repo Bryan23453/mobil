@@ -436,7 +436,7 @@ app.get("/facturas", async (req, res) => {
 ////////////////////////// GENERAR FACTURA ///////////////////////////
 app.post("/facturas/generar", async (req, res) => {
   try {
-    const { vendedor, tipo, fecha, estado, vendedorId, nombre } = req.body;
+    const { vendedor, tipo, fecha, estado } = req.body;
 
     if (!vendedor || !tipo || !fecha) {
       return res.status(400).json({ mensaje: "Faltan campos obligatorios" });
@@ -444,7 +444,14 @@ app.post("/facturas/generar", async (req, res) => {
 
     const fechaStr = fecha;
 
-    // Buscar movimientos usando la fecha exacta en formato string
+    // Buscar vendedor REAL en DB usando el nombre
+    const vendedorData = await Vendedores.findOne({ nombre: vendedor });
+
+    if (!vendedorData) {
+      return res.status(404).json({ mensaje: "El vendedor no existe" });
+    }
+
+    // Buscar movimientos usando la fecha exacta
     const movimientos = await Movimiento.find({
       Vendedor: vendedor,
       Fecha: fechaStr
@@ -457,7 +464,7 @@ app.post("/facturas/generar", async (req, res) => {
     let totalBotesCobrados = 0;
     let totalBolsasCobradas = 0;
 
-    // NUEVAS VARIABLES PARA BOTES PRESTADOS
+    // VARIABLES PARA BOTES PRESTADOS
     let botesLlenosEntregados = 0;
     let botesVaciosRegresados = 0;
     let botesLlenosRegresados = 0;
@@ -469,7 +476,6 @@ app.post("/facturas/generar", async (req, res) => {
         totalBotesCobrados += m.Cantidad_botes_vacios || 0;
         totalBolsasCobradas -= m.Cantidad_bolsas || 0;
 
-        // También se regresan botes vacíos y llenos
         botesVaciosRegresados += m.Cantidad_botes_vacios || 0;
         botesLlenosRegresados += m.Cantidad_botes_llenos || 0;
       }
@@ -477,7 +483,6 @@ app.post("/facturas/generar", async (req, res) => {
       if (m.Tipo === "salida") {
         totalBolsasCobradas += m.Cantidad_bolsas || 0;
 
-        // Salida = se entregan botes llenos
         botesLlenosEntregados += m.Cantidad_botes_llenos || 0;
       }
     });
@@ -508,24 +513,24 @@ app.post("/facturas/generar", async (req, res) => {
 
     await nuevaFactura.save();
 
-    // ---------------- CALCULAR BOTES PRESTADOS ----------------
+    /////////////////////// CALCULAR BOTES PRESTADOS ///////////////////////
 
     const totalRegresado = botesVaciosRegresados + botesLlenosRegresados;
 
     const botesPendientes = botesLlenosEntregados - totalRegresado;
 
     if (botesPendientes > 0) {
-      const registro = new BotesPrestados({
-        vendedorId,
-        nombre,
+      const registro = new Botes_prestados({
+        vendedorId: vendedorData._id.toString(),
+        nombre: vendedorData.nombre,
         botesPendientes,
-        fecha: new Date()
+        fecha: new Date().toLocaleDateString()
       });
 
       await registro.save();
     }
 
-    res.status(201).json({
+    return res.status(201).json({
       mensaje: "Factura generada correctamente",
       factura: nuevaFactura,
       detalleBotes: {
@@ -537,9 +542,10 @@ app.post("/facturas/generar", async (req, res) => {
 
   } catch (error) {
     console.error(error);
-    res.status(500).json({ mensaje: "Error al generar factura", error: error.message });
+    return res.status(500).json({ mensaje: "Error al generar factura", error: error.message });
   }
 });
+
 
 
 
