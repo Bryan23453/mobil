@@ -433,7 +433,6 @@ app.get("/facturas", async (req, res) => {
 });
 
 ////////////////////////// GENERAR FACTURA ///////////////////////////
-////////////////////////// GENERAR FACTURA ///////////////////////////
 app.post("/facturas/generar", async (req, res) => {
   try {
     const { vendedor, tipo, fecha, estado } = req.body;
@@ -442,16 +441,22 @@ app.post("/facturas/generar", async (req, res) => {
       return res.status(400).json({ mensaje: "Faltan campos obligatorios" });
     }
 
-    const fechaStr = fecha;
-
-    // Buscar vendedor REAL en DB usando el nombre
-    const vendedorData = await Vendedores.findOne({ nombre: vendedor });
+    // Buscar vendedor en la colección Usuarios
+    const vendedorData = await Usuarios.findOne({
+      nombre: vendedor,
+      rol: "Vendedor"
+    });
 
     if (!vendedorData) {
       return res.status(404).json({ mensaje: "El vendedor no existe" });
     }
 
-    // Buscar movimientos usando la fecha exacta
+    const vendedorIdReal = vendedorData._id;
+    const nombreReal = vendedorData.nombre;
+
+    const fechaStr = fecha;
+
+    // Buscar movimientos
     const movimientos = await Movimiento.find({
       Vendedor: vendedor,
       Fecha: fechaStr
@@ -464,14 +469,11 @@ app.post("/facturas/generar", async (req, res) => {
     let totalBotesCobrados = 0;
     let totalBolsasCobradas = 0;
 
-    // VARIABLES PARA BOTES PRESTADOS
     let botesLlenosEntregados = 0;
     let botesVaciosRegresados = 0;
     let botesLlenosRegresados = 0;
 
     movimientos.forEach(m => {
-
-      // ---------------- COBROS DE LA FACTURA ----------------
       if (m.Tipo === "entrada") {
         totalBotesCobrados += m.Cantidad_botes_vacios || 0;
         totalBolsasCobradas -= m.Cantidad_bolsas || 0;
@@ -482,14 +484,12 @@ app.post("/facturas/generar", async (req, res) => {
 
       if (m.Tipo === "salida") {
         totalBolsasCobradas += m.Cantidad_bolsas || 0;
-
         botesLlenosEntregados += m.Cantidad_botes_llenos || 0;
       }
     });
 
     totalBolsasCobradas = Math.max(0, totalBolsasCobradas);
 
-    // Productos facturados
     const productos = [];
     if (totalBotesCobrados > 0)
       productos.push({ nombre: "Botellón", cantidad: totalBotesCobrados, precio: 120 });
@@ -498,7 +498,6 @@ app.post("/facturas/generar", async (req, res) => {
 
     const total = productos.reduce((acc, p) => acc + (p.cantidad * p.precio), 0);
 
-    // Convertir fecha string → Date
     const [day, month, year] = fechaStr.split("/").map(Number);
     const fechaObj = new Date(year, month - 1, day);
 
@@ -513,24 +512,22 @@ app.post("/facturas/generar", async (req, res) => {
 
     await nuevaFactura.save();
 
-    /////////////////////// CALCULAR BOTES PRESTADOS ///////////////////////
-
+    // --- BOTES PRESTADOS ---
     const totalRegresado = botesVaciosRegresados + botesLlenosRegresados;
-
     const botesPendientes = botesLlenosEntregados - totalRegresado;
 
     if (botesPendientes > 0) {
-      const registro = new Botes_prestados({
-        vendedorId: vendedorData._id.toString(),
-        nombre: vendedorData.nombre,
+      const registro = new BotesPrestados({
+        vendedorId: vendedorIdReal,
+        nombre: nombreReal,
         botesPendientes,
-        fecha: new Date().toLocaleDateString()
+        fecha: new Date().toLocaleDateString("es-GT")
       });
 
       await registro.save();
     }
 
-    return res.status(201).json({
+    res.status(201).json({
       mensaje: "Factura generada correctamente",
       factura: nuevaFactura,
       detalleBotes: {
@@ -542,7 +539,7 @@ app.post("/facturas/generar", async (req, res) => {
 
   } catch (error) {
     console.error(error);
-    return res.status(500).json({ mensaje: "Error al generar factura", error: error.message });
+    res.status(500).json({ mensaje: "Error al generar factura", error: error.message });
   }
 });
 
