@@ -441,12 +441,11 @@ app.post("/facturas/generar", async (req, res) => {
       return res.status(400).json({ mensaje: "Faltan campos obligatorios" });
     }
 
-    // Buscar vendedor en la colección Usuarios
-    const vendedorData = await Usuario.findOne({
-      nombre: vendedor,
-      rol: "Vendedor"
-    });
-
+    // Buscar vendedor por "usuario" o por "nombre" (ambos)
+    let vendedorData = await Usuario.findOne({ usuario: vendedor, rol: "Vendedor" });
+    if (!vendedorData) {
+      vendedorData = await Usuario.findOne({ nombre: vendedor, rol: "Vendedor" });
+    }
 
     if (!vendedorData) {
       return res.status(404).json({ mensaje: "El vendedor no existe" });
@@ -455,18 +454,43 @@ app.post("/facturas/generar", async (req, res) => {
     const vendedorIdReal = vendedorData._id;
     const nombreReal = vendedorData.nombre;
 
-    const fechaStr = fecha;
+    const fechaStr = fecha.toString(); // "5/12/2025" por ejemplo
 
-    // Buscar movimientos
-    const movimientos = await Movimiento.find({
-      Vendedor: vendedor,
-      Fecha: fechaStr
-    });
+    // 1) Intentar buscar movimientos por string tal cual (caso actual)
+    let movimientos = await Movimiento.find({ Vendedor: vendedor, Fecha: fechaStr });
 
-    if (movimientos.length === 0) {
+    // 2) Si no encuentra, intentar con ceros: "05/12/2025"
+    if (!movimientos || movimientos.length === 0) {
+      const parts = fechaStr.split("/").map(s => s.padStart(2, "0"));
+      const fechaPad = parts.join("/");
+      movimientos = await Movimiento.find({ Vendedor: vendedor, Fecha: fechaPad });
+    }
+
+    // 3) Si sigue sin encontrar, intentar buscar por rango si los movimientos tienen fecha Date (no aplica si son strings)
+    if (!movimientos || movimientos.length === 0) {
+      console.log("No se encontraron movimientos por string. Intentando fallback con consulta amplia.");
+      // Intentar buscar cualquier movimiento del vendedor en ese día usando parsing:
+      const [d,m,y] = fechaStr.split("/").map(Number);
+      if (d && m && y) {
+        const inicio = new Date(y, m - 1, d);
+        const fin = new Date(y, m - 1, d + 1);
+        movimientos = await Movimiento.find({
+          Vendedor: vendedor,
+          // if Fecha stored as string this won't match; si tienes algunos documentos con Date, usar:
+          $or: [
+            { Fecha: fechaStr },
+            { Fecha: fechaStr.split("/").map(s=>s.padStart(2,'0')).join("/") },
+            { Fecha: { $gte: inicio.toISOString(), $lt: fin.toISOString() } } // raro si es string
+          ]
+        });
+      }
+    }
+
+    if (!movimientos || movimientos.length === 0) {
       return res.status(404).json({ mensaje: "No hay movimientos para esta fecha" });
     }
 
+    // — resto del cálculo igual —
     let totalBotesCobrados = 0;
     let totalBolsasCobradas = 0;
 
@@ -492,10 +516,8 @@ app.post("/facturas/generar", async (req, res) => {
     totalBolsasCobradas = Math.max(0, totalBolsasCobradas);
 
     const productos = [];
-    if (totalBotesCobrados > 0)
-      productos.push({ nombre: "Botellón", cantidad: totalBotesCobrados, precio: 120 });
-    if (totalBolsasCobradas > 0)
-      productos.push({ nombre: "Bolsa", cantidad: totalBolsasCobradas, precio: 45 });
+    if (totalBotesCobrados > 0) productos.push({ nombre: "Botellón", cantidad: totalBotesCobrados, precio: 120 });
+    if (totalBolsasCobradas > 0) productos.push({ nombre: "Bolsa", cantidad: totalBolsasCobradas, precio: 45 });
 
     const total = productos.reduce((acc, p) => acc + (p.cantidad * p.precio), 0);
 
@@ -518,14 +540,12 @@ app.post("/facturas/generar", async (req, res) => {
     const botesPendientes = botesLlenosEntregados - totalRegresado;
 
     if (botesPendientes > 0) {
-      const registro = new BotesPrestados({
-        vendedorId: vendedorIdReal,
+      await new BotesPrestados({
+        vendedorId: vendedorIdReal.toString(),
         nombre: nombreReal,
         botesPendientes,
-        fecha: new Date().toLocaleDateString("es-GT")
-      });
-
-      await registro.save();
+        fecha: new Date()
+      }).save();
     }
 
     res.status(201).json({
@@ -539,7 +559,7 @@ app.post("/facturas/generar", async (req, res) => {
     });
 
   } catch (error) {
-    console.error(error);
+    console.error("ERROR /facturas/generar:", error);
     res.status(500).json({ mensaje: "Error al generar factura", error: error.message });
   }
 });
@@ -553,20 +573,22 @@ app.get("/facturas/dia", async (req, res) => {
     const { fecha } = req.query;
     if (!fecha) return res.status(400).json({ mensaje: "Debe enviar la fecha" });
 
+    // fecha viene en formato "D/M/YYYY" o "DD/MM/YYYY"
     const [day, month, year] = fecha.split("/").map(Number);
-    const fechaObj = new Date(year, month - 1, day);
+    const inicio = new Date(year, month - 1, day);         // 00:00 local
+    const fin = new Date(year, month - 1, day + 1);       // siguiente día 00:00 local
 
     const facturas = await Factura.find({
-      fecha: { $eq: fechaObj }
-    });
+      fecha: { $gte: inicio, $lt: fin }
+    }).sort({ fecha: -1 });
 
     res.json(facturas);
-
   } catch (error) {
     console.error(error);
     res.status(500).json({ mensaje: "Error al obtener facturas", error: error.message });
   }
 });
+
 
 ////////////////////////// PREVIEW FACTURA ///////////////////////////
 app.get("/facturas/preview", async (req, res) => {
@@ -576,13 +598,18 @@ app.get("/facturas/preview", async (req, res) => {
       return res.status(400).json({ mensaje: "Faltan parámetros" });
     }
 
-    // Filtrar movimientos por string exacto
-    const movimientos = await Movimiento.find({
-      Vendedor: vendedor,
-      Fecha: fecha
-    });
+    // Primero intenta buscar movimientos por string exacto (tu actual formato)
+    let movimientos = await Movimiento.find({ Vendedor: vendedor, Fecha: fecha });
 
-    if (movimientos.length === 0) {
+    // Si no encuentra, intenta normalizar: si fecha es "D/M/YYYY" probar "DD/MM/YYYY" o ISO
+    if (!movimientos || movimientos.length === 0) {
+      // intentar con ceros delante
+      const parts = fecha.split("/").map(s => s.padLeft ? s.padLeft(2,'0') : s);
+      const fechaPad = parts.join("/"); // "05/12/2025" si venía "5/12/2025"
+      movimientos = await Movimiento.find({ Vendedor: vendedor, Fecha: fechaPad });
+    }
+
+    if (!movimientos || movimientos.length === 0) {
       return res.status(404).json({ mensaje: "No hay movimientos para esta fecha" });
     }
 
@@ -602,12 +629,12 @@ app.get("/facturas/preview", async (req, res) => {
     totalBolsas = Math.max(0, totalBolsas);
 
     res.json({ botes: totalBotes, bolsas: totalBolsas });
-
   } catch (error) {
     console.error(error);
     res.status(500).json({ mensaje: "Error al generar preview", error: error.message });
   }
 });
+
 app.put("/facturas/pagar", async (req, res) => {
   const { vendedor, fecha } = req.body;
 
