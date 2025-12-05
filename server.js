@@ -532,14 +532,17 @@ app.get("/facturas/preview", async (req, res) => {
       return res.status(400).json({ mensaje: "Faltan parámetros" });
     }
 
-    // Convertir fecha string "2025-12-04" a objeto Date
-    const fechaObj = new Date(fecha);
-    const inicio = new Date(fechaObj.setHours(0, 0, 0, 0));
-    const fin = new Date(fechaObj.setHours(23, 59, 59, 999));
+    // Convertir fecha string "YYYY-MM-DD" a objeto Date
+    const [year, month, day] = fecha.split("-").map(Number);
 
+    // Crear rango de fecha completo en UTC para cubrir todo el día
+    const inicio = new Date(Date.UTC(year, month - 1, day, 0, 0, 0));
+    const fin = new Date(Date.UTC(year, month - 1, day, 23, 59, 59, 999));
+
+    // Buscar movimientos del vendedor dentro de ese rango
     const movimientos = await Movimiento.find({
       Vendedor: vendedor,
-      Fecha: { $gte: inicio, $lte: fin }  // <- esto busca correctamente en Date
+      Fecha: { $gte: inicio, $lte: fin }
     });
 
     let totalBotes = 0;
