@@ -660,8 +660,7 @@ const PreciosSchema = new mongoose.Schema({
   fechaActualizacion: { type: Date, default: Date.now }
 });
 
-module.exports = mongoose.model("Precios", PreciosSchema);
-const Precios = require("./models/Precios");
+const Precios = mongoose.model("Precios", PreciosSchema);
 
 // Obtener precios
 app.get("/precios", async (req, res) => {
