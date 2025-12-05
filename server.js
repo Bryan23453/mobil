@@ -433,18 +433,18 @@ app.get("/facturas", async (req, res) => {
 });
 
 ////////////////////////// GENERAR FACTURA ///////////////////////////
+////////////////////////// GENERAR FACTURA ///////////////////////////
 app.post("/facturas/generar", async (req, res) => {
   try {
-    const { vendedor, tipo, fecha, estado } = req.body; // <-- agregamos estado
+    const { vendedor, tipo, fecha, estado, vendedorId, nombre } = req.body;
 
     if (!vendedor || !tipo || !fecha) {
       return res.status(400).json({ mensaje: "Faltan campos obligatorios" });
     }
 
-    // La fecha enviada debe ser string "D/M/YYYY"
     const fechaStr = fecha;
 
-    // Buscar movimientos con fecha exacta como string
+    // Buscar movimientos usando la fecha exacta en formato string
     const movimientos = await Movimiento.find({
       Vendedor: vendedor,
       Fecha: fechaStr
@@ -457,18 +457,34 @@ app.post("/facturas/generar", async (req, res) => {
     let totalBotesCobrados = 0;
     let totalBolsasCobradas = 0;
 
+    // NUEVAS VARIABLES PARA BOTES PRESTADOS
+    let botesLlenosEntregados = 0;
+    let botesVaciosRegresados = 0;
+    let botesLlenosRegresados = 0;
+
     movimientos.forEach(m => {
+
+      // ---------------- COBROS DE LA FACTURA ----------------
       if (m.Tipo === "entrada") {
         totalBotesCobrados += m.Cantidad_botes_vacios || 0;
         totalBolsasCobradas -= m.Cantidad_bolsas || 0;
+
+        // También se regresan botes vacíos y llenos
+        botesVaciosRegresados += m.Cantidad_botes_vacios || 0;
+        botesLlenosRegresados += m.Cantidad_botes_llenos || 0;
       }
+
       if (m.Tipo === "salida") {
         totalBolsasCobradas += m.Cantidad_bolsas || 0;
+
+        // Salida = se entregan botes llenos
+        botesLlenosEntregados += m.Cantidad_botes_llenos || 0;
       }
     });
 
     totalBolsasCobradas = Math.max(0, totalBolsasCobradas);
 
+    // Productos facturados
     const productos = [];
     if (totalBotesCobrados > 0)
       productos.push({ nombre: "Botellón", cantidad: totalBotesCobrados, precio: 120 });
@@ -477,28 +493,54 @@ app.post("/facturas/generar", async (req, res) => {
 
     const total = productos.reduce((acc, p) => acc + (p.cantidad * p.precio), 0);
 
-    // Guardar fecha como Date en factura
+    // Convertir fecha string → Date
     const [day, month, year] = fechaStr.split("/").map(Number);
     const fechaObj = new Date(year, month - 1, day);
 
-    // Usamos el estado enviado desde el frontend, si no viene, por defecto Pendiente
     const nuevaFactura = new Factura({
       vendedor,
       tipo,
       fecha: fechaObj,
       productos,
       total,
-      estado: estado || "Pendiente" // <-- aquí se toma del body
+      estado: estado || "Pendiente"
     });
 
     await nuevaFactura.save();
-    res.status(201).json({ mensaje: "Factura generada correctamente", factura: nuevaFactura });
+
+    // ---------------- CALCULAR BOTES PRESTADOS ----------------
+
+    const totalRegresado = botesVaciosRegresados + botesLlenosRegresados;
+
+    const botesPendientes = botesLlenosEntregados - totalRegresado;
+
+    if (botesPendientes > 0) {
+      const registro = new BotesPrestados({
+        vendedorId,
+        nombre,
+        botesPendientes,
+        fecha: new Date()
+      });
+
+      await registro.save();
+    }
+
+    res.status(201).json({
+      mensaje: "Factura generada correctamente",
+      factura: nuevaFactura,
+      detalleBotes: {
+        entregados: botesLlenosEntregados,
+        regresados: totalRegresado,
+        pendientes: botesPendientes
+      }
+    });
 
   } catch (error) {
     console.error(error);
     res.status(500).json({ mensaje: "Error al generar factura", error: error.message });
   }
 });
+
 
 
 ////////////////////////// FACTURAS DEL DÍA ///////////////////////////
