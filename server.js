@@ -534,3 +534,40 @@ app.get("/facturas/dia", async (req, res) => {
     res.status(500).json({ mensaje: "Error al obtener facturas", error: error.message });
   }
 });
+app.get("/facturas/preview", async (req, res) => {
+  try {
+    const { vendedor, fecha } = req.query;
+    if (!vendedor || !fecha) {
+      return res.status(400).json({ mensaje: "Faltan parámetros" });
+    }
+
+    const fechaObj = new Date(fecha);
+    const inicio = new Date(fechaObj.setHours(0,0,0,0));
+    const fin = new Date(fechaObj.setHours(23,59,59,999));
+
+    const movimientos = await Movimiento.find({
+      Vendedor: vendedor,
+      Fecha: { $gte: inicio, $lte: fin }
+    });
+
+    let totalBotes = 0;
+    let totalBolsas = 0;
+
+    movimientos.forEach(m => {
+      if (m.Tipo === "entrada") {
+        totalBotes += m.Cantidad_botes_vacios || 0;
+        totalBolsas -= m.Cantidad_bolsas || 0;
+      }
+      if (m.Tipo === "salida") {
+        totalBolsas += m.Cantidad_bolsas || 0;
+      }
+    });
+
+    totalBolsas = Math.max(0, totalBolsas);
+
+    res.json({ botes: totalBotes, bolsas: totalBolsas });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ mensaje: "Error al generar preview", error: error.message });
+  }
+});
