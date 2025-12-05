@@ -391,7 +391,7 @@ app.get("/botes-prestados", async (req, res) => {
   }
 });
 
-/////////////////////////// Facturaaaaaaaa ///////////////////////////
+////////////////////////// FACTURAAAAAAAA ///////////////////////////
 const facturaSchema = new mongoose.Schema({
   vendedor: { type: String, required: true },
   tipo: { type: String, required: true }, // "Vendedor" o "Directa"
@@ -403,14 +403,14 @@ const facturaSchema = new mongoose.Schema({
       precio: { type: Number, required: true }
     }
   ],
+  total: { type: Number, required: true },  // <---- AGREGADO
   estado: { type: String, required: true } // "Pagada" o "Pendiente"
 }, { collection: "Facturas" });
 
 const Factura = mongoose.model("Factura", facturaSchema);
 
 
-// GET /facturas?tipo=&estado=&fecha=
-// Backend: GET /facturas?tipo=&estado=&fecha=
+////////////////////////// GET FACTURAS ///////////////////////////
 app.get("/facturas", async (req, res) => {
   try {
     const { tipo, estado, fecha } = req.query;
@@ -420,10 +420,7 @@ app.get("/facturas", async (req, res) => {
     if (estado && estado !== "Todos") filtro.estado = estado;
 
     if (fecha) {
-      // Convertimos la fecha de string a Date
       const fechaObj = new Date(fecha);
-
-      // Creamos un rango: desde el inicio del día hasta el final
       const inicio = new Date(fechaObj.setHours(0,0,0,0));
       const fin = new Date(fechaObj.setHours(23,59,59,999));
 
@@ -432,15 +429,15 @@ app.get("/facturas", async (req, res) => {
 
     const facturas = await Factura.find(filtro).sort({ fecha: -1 });
     res.json(facturas);
+
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: "Error al obtener facturas" });
   }
 });
-////////////////////////// FACTURAS NUEVOS ENDPOINTS ///////////////////////////
 
-// POST /facturas/generar
-// Body: { "vendedor": "Juan Pérez", "tipo": "Vendedor", "fecha": "2025-12-01" }
+
+////////////////////////// FACTURAS NUEVOS ENDPOINTS ///////////////////////////
 app.post("/facturas/generar", async (req, res) => {
   try {
     const { vendedor, tipo, fecha } = req.body;
@@ -453,7 +450,7 @@ app.post("/facturas/generar", async (req, res) => {
     const inicio = new Date(fechaObj.setHours(0,0,0,0));
     const fin = new Date(fechaObj.setHours(23,59,59,999));
 
-    // Obtener todos los movimientos del vendedor en ese día
+    // Obtener movimientos del vendedor en ese día
     const movimientos = await Movimiento.find({
       Vendedor: vendedor,
       Fecha: { $gte: inicio, $lte: fin }
@@ -463,31 +460,50 @@ app.post("/facturas/generar", async (req, res) => {
       return res.status(404).json({ mensaje: "No hay movimientos para esta fecha" });
     }
 
-    // Generar resumen de productos
-    let totalBotesLlenos = 0;
-    let totalBotesVacios = 0;
-    let totalBolsas = 0;
+    // ---------------------- CÁLCULO CORRECTO DE COBRO ----------------------
+    let totalBotesCobrados = 0;
+    let totalBolsasCobradas = 0;
 
     movimientos.forEach(m => {
-      totalBotesLlenos += m.Cantidad_botes_llenos || 0;
-      totalBotesVacios += m.Cantidad_botes_vacios || 0;
-      totalBolsas += m.Cantidad_bolsas || 0;
+      // ENTRADAS = lo que regresan
+      if (m.Tipo === "entrada") {
+        totalBotesCobrados += m.Cantidad_botes_vacios || 0;
+        totalBolsasCobradas -= m.Cantidad_bolsas || 0;
+      }
+
+      // SALIDAS = lo que se llevan
+      if (m.Tipo === "salida") {
+        totalBolsasCobradas += m.Cantidad_bolsas || 0;
+      }
     });
 
-    const productos = [];
-    if (totalBotesLlenos > 0) productos.push({ nombre: "Botellón", cantidad: totalBotesLlenos, precio: 120 });
-    if (totalBolsas > 0) productos.push({ nombre: "Bolsa", cantidad: totalBolsas, precio: 45 });
+    // No permitir números negativos
+    totalBolsasCobradas = Math.max(0, totalBolsasCobradas);
 
-    // Crear factura
+    // ---------------------- CREAR PRODUCTOS ----------------------
+    const productos = [];
+
+    if (totalBotesCobrados > 0)
+      productos.push({ nombre: "Botellón", cantidad: totalBotesCobrados, precio: 120 });
+
+    if (totalBolsasCobradas > 0)
+      productos.push({ nombre: "Bolsa", cantidad: totalBolsasCobradas, precio: 45 });
+
+    // ---------------------- CALCULAR TOTAL ----------------------
+    const total = productos.reduce((acc, p) => acc + (p.cantidad * p.precio), 0);
+
+    // ---------------------- CREAR FACTURA ----------------------
     const nuevaFactura = new Factura({
       vendedor,
       tipo,
       fecha: inicio,
       productos,
+      total,
       estado: "Pendiente"
     });
 
     await nuevaFactura.save();
+
     res.status(201).json({ mensaje: "Factura generada correctamente", factura: nuevaFactura });
 
   } catch (error) {
@@ -496,7 +512,8 @@ app.post("/facturas/generar", async (req, res) => {
   }
 });
 
-// GET /facturas/dia?fecha=YYYY-MM-DD
+
+////////////////////////// GET FACTURAS DEL DÍA ///////////////////////////
 app.get("/facturas/dia", async (req, res) => {
   try {
     const { fecha } = req.query;
