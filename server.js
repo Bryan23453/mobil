@@ -403,12 +403,11 @@ const facturaSchema = new mongoose.Schema({
       precio: { type: Number, required: true }
     }
   ],
-  total: { type: Number, required: true },  // <---- AGREGADO
+  total: { type: Number, required: true },
   estado: { type: String, required: true } // "Pagada" o "Pendiente"
 }, { collection: "Facturas" });
 
 const Factura = mongoose.model("Factura", facturaSchema);
-
 
 ////////////////////////// GET FACTURAS ///////////////////////////
 app.get("/facturas", async (req, res) => {
@@ -420,12 +419,8 @@ app.get("/facturas", async (req, res) => {
     if (estado && estado !== "Todos") filtro.estado = estado;
 
     if (fecha) {
-      const fechaObj = new Date(fecha);
-const inicio = new Date(Date.UTC(year, month - 1, day, 0, 0, 0));
-const fin = new Date(Date.UTC(year, month - 1, day, 23, 59, 59, 999));
-
-
-      filtro.fecha = { $gte: inicio, $lte: fin };
+      // Buscar por string exacto
+      filtro.fecha = { $eq: new Date(fecha) };
     }
 
     const facturas = await Factura.find(filtro).sort({ fecha: -1 });
@@ -437,8 +432,7 @@ const fin = new Date(Date.UTC(year, month - 1, day, 23, 59, 59, 999));
   }
 });
 
-
-////////////////////////// FACTURAS NUEVOS ENDPOINTS ///////////////////////////
+////////////////////////// GENERAR FACTURA ///////////////////////////
 app.post("/facturas/generar", async (req, res) => {
   try {
     const { vendedor, tipo, fecha } = req.body;
@@ -447,24 +441,19 @@ app.post("/facturas/generar", async (req, res) => {
       return res.status(400).json({ mensaje: "Faltan campos obligatorios" });
     }
 
-    // Convertir fecha enviada a día, mes, año
-    const [year, month, day] = fecha.split("-").map(Number);
-    const fechaObj = new Date(year, month - 1, day);
+    // La fecha enviada debe ser string "D/M/YYYY"
+    const fechaStr = fecha;
 
-    // Buscar movimientos por día, sin importar formato de hora
-  const inicio = new Date(year, month - 1, day, 0, 0, 0);
-const fin = new Date(year, month - 1, day, 23, 59, 59, 999);
-
-const movimientos = await Movimiento.find({
-  Vendedor: vendedor,
-  Fecha: { $gte: inicio, $lte: fin }
-});
+    // Buscar movimientos con fecha exacta como string
+    const movimientos = await Movimiento.find({
+      Vendedor: vendedor,
+      Fecha: fechaStr
+    });
 
     if (movimientos.length === 0) {
       return res.status(404).json({ mensaje: "No hay movimientos para esta fecha" });
     }
 
-    // ---------------------- CÁLCULO CORRECTO DE COBRO ----------------------
     let totalBotesCobrados = 0;
     let totalBolsasCobradas = 0;
 
@@ -488,6 +477,10 @@ const movimientos = await Movimiento.find({
 
     const total = productos.reduce((acc, p) => acc + (p.cantidad * p.precio), 0);
 
+    // Guardar fecha como Date en factura
+    const [day, month, year] = fechaStr.split("/").map(Number);
+    const fechaObj = new Date(year, month - 1, day);
+
     const nuevaFactura = new Factura({
       vendedor,
       tipo,
@@ -506,20 +499,17 @@ const movimientos = await Movimiento.find({
   }
 });
 
-
-
-////////////////////////// GET FACTURAS DEL DÍA ///////////////////////////
+////////////////////////// FACTURAS DEL DÍA ///////////////////////////
 app.get("/facturas/dia", async (req, res) => {
   try {
     const { fecha } = req.query;
     if (!fecha) return res.status(400).json({ mensaje: "Debe enviar la fecha" });
 
-    const fechaObj = new Date(fecha);
-    const inicio = new Date(fechaObj.setHours(0,0,0,0));
-    const fin = new Date(fechaObj.setHours(23,59,59,999));
+    const [day, month, year] = fecha.split("/").map(Number);
+    const fechaObj = new Date(year, month - 1, day);
 
     const facturas = await Factura.find({
-      fecha: { $gte: inicio, $lte: fin }
+      fecha: { $eq: fechaObj }
     });
 
     res.json(facturas);
@@ -529,6 +519,8 @@ app.get("/facturas/dia", async (req, res) => {
     res.status(500).json({ mensaje: "Error al obtener facturas", error: error.message });
   }
 });
+
+////////////////////////// PREVIEW FACTURA ///////////////////////////
 app.get("/facturas/preview", async (req, res) => {
   try {
     const { vendedor, fecha } = req.query;
@@ -536,29 +528,15 @@ app.get("/facturas/preview", async (req, res) => {
       return res.status(400).json({ mensaje: "Faltan parámetros" });
     }
 
-    console.log("Preview solicitado para:", vendedor, "fecha:", fecha);
-
-    // Separar la fecha manualmente según tu formato "D/M/YYYY"
-    const partes = fecha.split("/").map(Number);
-    if (partes.length !== 3) {
-      return res.status(400).json({ mensaje: "Formato de fecha incorrecto" });
-    }
-
-    const [day, month, year] = partes;
-    const inicio = new Date(year, month - 1, day, 0, 0, 0);
-    const fin = new Date(year, month - 1, day, 23, 59, 59, 999);
-
-    console.log("Rango de fecha usado:", inicio.toISOString(), "->", fin.toISOString());
-
+    // Filtrar movimientos por string exacto
     const movimientos = await Movimiento.find({
       Vendedor: vendedor,
-      Fecha: { $gte: inicio, $lte: fin }
+      Fecha: fecha
     });
 
-    console.log("Movimientos encontrados:", movimientos.length);
-    movimientos.forEach((m, i) => {
-      console.log(`Movimiento ${i}: Tipo=${m.Tipo}, Botes=${m.Cantidad_botes_vacios}, Bolsas=${m.Cantidad_bolsas}, Fecha=${m.Fecha}`);
-    });
+    if (movimientos.length === 0) {
+      return res.status(404).json({ mensaje: "No hay movimientos para esta fecha" });
+    }
 
     let totalBotes = 0;
     let totalBolsas = 0;
@@ -575,9 +553,8 @@ app.get("/facturas/preview", async (req, res) => {
 
     totalBolsas = Math.max(0, totalBolsas);
 
-    console.log("Totales calculados -> Botes:", totalBotes, "Bolsas:", totalBolsas);
-
     res.json({ botes: totalBotes, bolsas: totalBolsas });
+
   } catch (error) {
     console.error(error);
     res.status(500).json({ mensaje: "Error al generar preview", error: error.message });
