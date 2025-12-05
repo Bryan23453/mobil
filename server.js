@@ -656,6 +656,32 @@ app.put("/facturas/pagar", async (req, res) => {
     res.status(500).json({ message: "Error al actualizar factura", error });
   }
 });
+////////////////////////// BORRAR FACTURA ///////////////////////////
+app.delete("/facturas/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // Buscar y eliminar la factura
+    const facturaEliminada = await Factura.findByIdAndDelete(id);
+
+    if (!facturaEliminada) {
+      return res.status(404).json({ mensaje: "Factura no encontrada" });
+    }
+
+    // Opcional: actualizar BotesPrestados si la factura eliminada tenía botellones pendientes
+    const botesPrestados = await BotesPrestados.find({ vendedorId: facturaEliminada.vendedor });
+    if (botesPrestados.length > 0) {
+      // Aquí podrías ajustar la cantidad de botesPendientes según lo que tenía la factura eliminada
+      // Por simplicidad, dejamos como está
+    }
+
+    res.status(200).json({ mensaje: "Factura eliminada correctamente", factura: facturaEliminada });
+  } catch (error) {
+    console.error("ERROR /facturas/:id DELETE:", error);
+    res.status(500).json({ mensaje: "Error al eliminar factura", error: error.message });
+  }
+});
+
 ////////////////////////////precios/////////////////////////////////////
 const PreciosSchema = new mongoose.Schema({
   botellon: { type: Number, required: true },
