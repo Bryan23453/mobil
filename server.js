@@ -421,8 +421,9 @@ app.get("/facturas", async (req, res) => {
 
     if (fecha) {
       const fechaObj = new Date(fecha);
-      const inicio = new Date(fechaObj.setHours(0,0,0,0));
-      const fin = new Date(fechaObj.setHours(23,59,59,999));
+const inicio = new Date(Date.UTC(year, month - 1, day, 0, 0, 0));
+const fin = new Date(Date.UTC(year, month - 1, day, 23, 59, 59, 999));
+
 
       filtro.fecha = { $gte: inicio, $lte: fin };
     }
