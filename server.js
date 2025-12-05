@@ -435,7 +435,7 @@ app.get("/facturas", async (req, res) => {
 ////////////////////////// GENERAR FACTURA ///////////////////////////
 app.post("/facturas/generar", async (req, res) => {
   try {
-    const { vendedor, tipo, fecha } = req.body;
+    const { vendedor, tipo, fecha, estado } = req.body; // <-- agregamos estado
 
     if (!vendedor || !tipo || !fecha) {
       return res.status(400).json({ mensaje: "Faltan campos obligatorios" });
@@ -481,13 +481,14 @@ app.post("/facturas/generar", async (req, res) => {
     const [day, month, year] = fechaStr.split("/").map(Number);
     const fechaObj = new Date(year, month - 1, day);
 
+    // Usamos el estado enviado desde el frontend, si no viene, por defecto Pendiente
     const nuevaFactura = new Factura({
       vendedor,
       tipo,
       fecha: fechaObj,
       productos,
       total,
-      estado: "Pendiente"
+      estado: estado || "Pendiente" // <-- aquí se toma del body
     });
 
     await nuevaFactura.save();
@@ -498,6 +499,7 @@ app.post("/facturas/generar", async (req, res) => {
     res.status(500).json({ mensaje: "Error al generar factura", error: error.message });
   }
 });
+
 
 ////////////////////////// FACTURAS DEL DÍA ///////////////////////////
 app.get("/facturas/dia", async (req, res) => {
