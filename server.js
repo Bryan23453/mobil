@@ -451,10 +451,13 @@ app.post("/facturas/generar", async (req, res) => {
     const fechaObj = new Date(year, month - 1, day);
 
     // Buscar movimientos por día, sin importar formato de hora
-    const movimientos = await Movimiento.find({
-      Vendedor: vendedor,
-      Fecha: new RegExp(`^${day}/${month}/${year}$`) // Esto funciona para tu colección movimientos
-    });
+  const inicio = new Date(year, month - 1, day, 0, 0, 0);
+const fin = new Date(year, month - 1, day, 23, 59, 59, 999);
+
+const movimientos = await Movimiento.find({
+  Vendedor: vendedor,
+  Fecha: { $gte: inicio, $lte: fin }
+});
 
     if (movimientos.length === 0) {
       return res.status(404).json({ mensaje: "No hay movimientos para esta fecha" });
