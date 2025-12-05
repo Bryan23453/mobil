@@ -446,14 +446,14 @@ app.post("/facturas/generar", async (req, res) => {
       return res.status(400).json({ mensaje: "Faltan campos obligatorios" });
     }
 
-    const fechaObj = new Date(fecha);
-    const inicio = new Date(fechaObj.setHours(0,0,0,0));
-    const fin = new Date(fechaObj.setHours(23,59,59,999));
+    // Convertir fecha enviada a día, mes, año
+    const [year, month, day] = fecha.split("-").map(Number);
+    const fechaObj = new Date(year, month - 1, day);
 
-    // Obtener movimientos del vendedor en ese día
+    // Buscar movimientos por día, sin importar formato de hora
     const movimientos = await Movimiento.find({
       Vendedor: vendedor,
-      Fecha: { $gte: inicio, $lte: fin }
+      Fecha: new RegExp(`^${day}/${month}/${year}$`) // Esto funciona para tu colección movimientos
     });
 
     if (movimientos.length === 0) {
@@ -465,45 +465,35 @@ app.post("/facturas/generar", async (req, res) => {
     let totalBolsasCobradas = 0;
 
     movimientos.forEach(m => {
-      // ENTRADAS = lo que regresan
       if (m.Tipo === "entrada") {
         totalBotesCobrados += m.Cantidad_botes_vacios || 0;
         totalBolsasCobradas -= m.Cantidad_bolsas || 0;
       }
-
-      // SALIDAS = lo que se llevan
       if (m.Tipo === "salida") {
         totalBolsasCobradas += m.Cantidad_bolsas || 0;
       }
     });
 
-    // No permitir números negativos
     totalBolsasCobradas = Math.max(0, totalBolsasCobradas);
 
-    // ---------------------- CREAR PRODUCTOS ----------------------
     const productos = [];
-
     if (totalBotesCobrados > 0)
       productos.push({ nombre: "Botellón", cantidad: totalBotesCobrados, precio: 120 });
-
     if (totalBolsasCobradas > 0)
       productos.push({ nombre: "Bolsa", cantidad: totalBolsasCobradas, precio: 45 });
 
-    // ---------------------- CALCULAR TOTAL ----------------------
     const total = productos.reduce((acc, p) => acc + (p.cantidad * p.precio), 0);
 
-    // ---------------------- CREAR FACTURA ----------------------
     const nuevaFactura = new Factura({
       vendedor,
       tipo,
-      fecha: inicio,
+      fecha: fechaObj,
       productos,
       total,
       estado: "Pendiente"
     });
 
     await nuevaFactura.save();
-
     res.status(201).json({ mensaje: "Factura generada correctamente", factura: nuevaFactura });
 
   } catch (error) {
@@ -511,6 +501,7 @@ app.post("/facturas/generar", async (req, res) => {
     res.status(500).json({ mensaje: "Error al generar factura", error: error.message });
   }
 });
+
 
 
 ////////////////////////// GET FACTURAS DEL DÍA ///////////////////////////
