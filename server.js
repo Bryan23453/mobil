@@ -534,16 +534,18 @@ app.get("/facturas/preview", async (req, res) => {
 
     console.log("Preview solicitado para:", vendedor, "fecha:", fecha);
 
-    // Convertir fecha string "YYYY-MM-DD" a objeto Date
-    const [year, month, day] = fecha.split("-").map(Number);
+    // Separar la fecha manualmente según tu formato "D/M/YYYY"
+    const partes = fecha.split("/").map(Number);
+    if (partes.length !== 3) {
+      return res.status(400).json({ mensaje: "Formato de fecha incorrecto" });
+    }
 
-    // Crear rango de fecha completo
-    const inicio = new Date(Date.UTC(year, month - 1, day, 0, 0, 0));
-    const fin = new Date(Date.UTC(year, month - 1, day, 23, 59, 59, 999));
+    const [day, month, year] = partes;
+    const inicio = new Date(year, month - 1, day, 0, 0, 0);
+    const fin = new Date(year, month - 1, day, 23, 59, 59, 999);
 
     console.log("Rango de fecha usado:", inicio.toISOString(), "->", fin.toISOString());
 
-    // Buscar movimientos del vendedor dentro de ese rango
     const movimientos = await Movimiento.find({
       Vendedor: vendedor,
       Fecha: { $gte: inicio, $lte: fin }
