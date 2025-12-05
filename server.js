@@ -442,10 +442,11 @@ app.post("/facturas/generar", async (req, res) => {
     }
 
     // Buscar vendedor en la colección Usuarios
-    const vendedorData = await Usuarios.findOne({
+    const vendedorData = await Usuario.findOne({
       nombre: vendedor,
       rol: "Vendedor"
     });
+
 
     if (!vendedorData) {
       return res.status(404).json({ mensaje: "El vendedor no existe" });
