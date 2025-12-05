@@ -441,32 +441,27 @@ app.post("/facturas/generar", async (req, res) => {
       return res.status(400).json({ mensaje: "Faltan campos obligatorios" });
     }
 
-    // Buscar vendedor por "usuario" o por "nombre" (ambos)
+    // Obtener datos del vendedor
     let vendedorData = await Usuario.findOne({ usuario: vendedor, rol: "Vendedor" });
     if (!vendedorData) {
       vendedorData = await Usuario.findOne({ nombre: vendedor, rol: "Vendedor" });
     }
-
     if (!vendedorData) {
       return res.status(404).json({ mensaje: "El vendedor no existe" });
     }
-
     const vendedorIdReal = vendedorData._id;
     const nombreReal = vendedorData.nombre;
 
-    const fechaStr = fecha.toString(); // "5/12/2025" por ejemplo
+    const fechaStr = fecha.toString();
 
-    // 1) Intentar buscar movimientos por string tal cual
+    // Obtener movimientos del día
     let movimientos = await Movimiento.find({ Vendedor: vendedor, Fecha: fechaStr });
-
-    // 2) Si no encuentra, intentar con ceros: "05/12/2025"
     if (!movimientos || movimientos.length === 0) {
       const parts = fechaStr.split("/").map(s => s.padStart(2, "0"));
       const fechaPad = parts.join("/");
       movimientos = await Movimiento.find({ Vendedor: vendedor, Fecha: fechaPad });
     }
 
-    // 3) Si sigue sin encontrar, intentar buscar por rango si los movimientos tienen fecha Date
     if (!movimientos || movimientos.length === 0) {
       const [d, m, y] = fechaStr.split("/").map(Number);
       if (d && m && y) {
@@ -487,7 +482,7 @@ app.post("/facturas/generar", async (req, res) => {
       return res.status(404).json({ mensaje: "No hay movimientos para esta fecha" });
     }
 
-    // — Cálculo de cantidades —
+    // Calcular cantidades
     let totalBotesCobrados = 0;
     let totalBolsasCobradas = 0;
     let botesLlenosEntregados = 0;
@@ -510,25 +505,27 @@ app.post("/facturas/generar", async (req, res) => {
 
     totalBolsasCobradas = Math.max(0, totalBolsasCobradas);
 
-    // --- TRAER PRECIOS REALES DE LA DB ---
-    const productosDB = await Producto.find(); // Asegúrate de que tu modelo se llame "Producto"
-    const productos = [];
-
-    if (totalBotesCobrados > 0) {
-      const precioBotellon = productosDB.find(p => p.nombre.toLowerCase() === "botellón")?.precio || 120;
-      productos.push({ nombre: "Botellón", cantidad: totalBotesCobrados, precio: precioBotellon });
+    // --- TRAER PRECIOS DE LA COLECCIÓN `Precios` ---
+    const preciosActuales = await Precios.findOne({});
+    if (!preciosActuales) {
+      return res.status(500).json({ mensaje: "No hay precios configurados" });
     }
 
+    const productos = [];
+    if (totalBotesCobrados > 0) {
+      productos.push({ nombre: "Botellón", cantidad: totalBotesCobrados, precio: preciosActuales.botellon });
+    }
     if (totalBolsasCobradas > 0) {
-      const precioBolsa = productosDB.find(p => p.nombre.toLowerCase() === "bolsa")?.precio || 45;
-      productos.push({ nombre: "Bolsa", cantidad: totalBolsasCobradas, precio: precioBolsa });
+      productos.push({ nombre: "Bolsa", cantidad: totalBolsasCobradas, precio: preciosActuales.bolsa });
     }
 
     const total = productos.reduce((acc, p) => acc + (p.cantidad * p.precio), 0);
 
+    // Crear objeto fecha
     const [day, month, year] = fechaStr.split("/").map(Number);
     const fechaObj = new Date(year, month - 1, day);
 
+    // Guardar factura
     const nuevaFactura = new Factura({
       vendedor,
       tipo,
@@ -540,7 +537,7 @@ app.post("/facturas/generar", async (req, res) => {
 
     await nuevaFactura.save();
 
-    // --- BOTES PRESTADOS ---
+    // Calcular botes pendientes
     const totalRegresado = botesVaciosRegresados + botesLlenosRegresados;
     const botesPendientes = botesLlenosEntregados - totalRegresado;
 
