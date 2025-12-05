@@ -541,13 +541,10 @@ app.get("/facturas/preview", async (req, res) => {
       return res.status(400).json({ mensaje: "Faltan parámetros" });
     }
 
-    const fechaObj = new Date(fecha);
-    const inicio = new Date(fechaObj.setHours(0,0,0,0));
-    const fin = new Date(fechaObj.setHours(23,59,59,999));
-
+    // Buscar movimientos del vendedor con la fecha exacta como string
     const movimientos = await Movimiento.find({
       Vendedor: vendedor,
-      Fecha: { $gte: inicio, $lte: fin }
+      Fecha: fecha  // <-- comparar directamente con tu formato "d/m/yyyy"
     });
 
     let totalBotes = 0;
