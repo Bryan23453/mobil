@@ -532,17 +532,26 @@ app.get("/facturas/preview", async (req, res) => {
       return res.status(400).json({ mensaje: "Faltan parámetros" });
     }
 
+    console.log("Preview solicitado para:", vendedor, "fecha:", fecha);
+
     // Convertir fecha string "YYYY-MM-DD" a objeto Date
     const [year, month, day] = fecha.split("-").map(Number);
 
-    // Crear rango de fecha completo en UTC para cubrir todo el día
+    // Crear rango de fecha completo
     const inicio = new Date(Date.UTC(year, month - 1, day, 0, 0, 0));
     const fin = new Date(Date.UTC(year, month - 1, day, 23, 59, 59, 999));
+
+    console.log("Rango de fecha usado:", inicio.toISOString(), "->", fin.toISOString());
 
     // Buscar movimientos del vendedor dentro de ese rango
     const movimientos = await Movimiento.find({
       Vendedor: vendedor,
       Fecha: { $gte: inicio, $lte: fin }
+    });
+
+    console.log("Movimientos encontrados:", movimientos.length);
+    movimientos.forEach((m, i) => {
+      console.log(`Movimiento ${i}: Tipo=${m.Tipo}, Botes=${m.Cantidad_botes_vacios}, Bolsas=${m.Cantidad_bolsas}, Fecha=${m.Fecha}`);
     });
 
     let totalBotes = 0;
@@ -559,6 +568,8 @@ app.get("/facturas/preview", async (req, res) => {
     });
 
     totalBolsas = Math.max(0, totalBolsas);
+
+    console.log("Totales calculados -> Botes:", totalBotes, "Bolsas:", totalBolsas);
 
     res.json({ botes: totalBotes, bolsas: totalBolsas });
   } catch (error) {
