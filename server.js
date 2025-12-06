@@ -7,10 +7,10 @@ app.use(express.json());
 
 const PORT = process.env.PORT || 3000;
 
-//pa entrar a mongo atlas
+//pa entrar 
 mongoose.connect(process.env.MONGO_URL)
-  .then(() => console.log("toy siiii"))
-  .catch(err => console.error("no toy soy mongolo ", err));
+  .then(() => console.log("Entra a base de datos"))
+  .catch(err => console.error("Error al entrar a base de datos ", err));
 
 // usuarios
 const usuarioSchema = new mongoose.Schema({
@@ -86,14 +86,13 @@ app.delete('/usuarios/:id', async (req, res) => {
 });
 
 ///////////////////////////salidas////////////////////////////////////////////////////////////////////////////
-// Schema para movimientos (entradas y salidas)
 const movimientoSchema = new mongoose.Schema({
   Fecha: { type: String, required: true },
   Vendedor: { type: String, required: true },
   Tipo: { type: String, enum: ['entrada', 'salida'], required: true },
   Cantidad_bolsas: { type: Number, default: 0 },
   Cantidad_botes_llenos: { type: Number, default: 0 },
-  Cantidad_botes_vacios: { type: Number, default: 0 } // <-- nuevo campo
+  Cantidad_botes_vacios: { type: Number, default: 0 } 
 }, { collection: 'Movimientos' });
 
 const Movimiento = mongoose.model('Movimiento', movimientoSchema);
@@ -113,7 +112,6 @@ app.post('/movimientos', async (req, res) => {
   try {
     const { Tipo, Cantidad_botes_llenos, Cantidad_botes_vacios } = req.body;
 
-    // Si es salida, los botes vacíos siempre serán 0
     if (Tipo === 'salida') req.body.Cantidad_botes_vacios = 0;
 
     const nuevoMovimiento = new Movimiento(req.body);
@@ -129,7 +127,6 @@ app.put('/movimientos/:id', async (req, res) => {
   try {
     const { Tipo } = req.body;
 
-    // Si es salida, los botes vacíos siempre serán 0
     if (Tipo === 'salida') req.body.Cantidad_botes_vacios = 0;
 
     const movimientoActualizado = await Movimiento.findByIdAndUpdate(
@@ -162,11 +159,10 @@ app.delete('/movimientos/:id', async (req, res) => {
 });
 
 
-// ver si toy
+
 app.listen(PORT, () => console.log(`Servidor corriendo en puerto ${PORT}`));
 
 ///////////////////////////productos/inventarios////////////////////////////////////////////////////////////////////////////
-// ------------------- Modelo -------------------
 const productoSchema = new mongoose.Schema({
   nombre: { type: String, required: true },
   cantidad: { type: Number, required: true },
@@ -175,7 +171,6 @@ const productoSchema = new mongoose.Schema({
 
 const Producto = mongoose.model("Producto", productoSchema, "Inventario");
 
-// ------------------- Endpoints -------------------
 
 // Obtener todos los productos
 app.get("/productos", async (req, res) => {
@@ -239,7 +234,6 @@ app.delete("/productos/:id", async (req, res) => {
 
 /////////////////////////// contabilidad (ingresos y gastos) ///////////////////////////
 
-// Schema para contabilidad
 const contabilidadSchema = new mongoose.Schema({
   descripcion: { type: String, required: true },
   monto: { type: Number, required: true },
@@ -249,7 +243,7 @@ const contabilidadSchema = new mongoose.Schema({
 
 const Contabilidad = mongoose.model('Contabilidad', contabilidadSchema);
 
-// ---------------- GET todos los registros contables ----------------
+// ---------------- GET todos los registros ----------------
 app.get('/contabilidad', async (req, res) => {
   try {
     const registros = await Contabilidad.find();
@@ -260,7 +254,7 @@ app.get('/contabilidad', async (req, res) => {
   }
 });
 
-// ---------------- POST nuevo registro contable ----------------
+// ----------------  nuevo registro  ----------------
 app.post('/contabilidad', async (req, res) => {
   try {
     const { descripcion, monto, tipo, fecha } = req.body;
@@ -273,7 +267,7 @@ app.post('/contabilidad', async (req, res) => {
   }
 });
 
-// ---------------- PUT editar registro contable ----------------
+// ----------------  editar registro  ----------------
 app.put('/contabilidad/:id', async (req, res) => {
   try {
     const { descripcion, monto, tipo, fecha } = req.body;
@@ -294,7 +288,7 @@ app.put('/contabilidad/:id', async (req, res) => {
   }
 });
 
-// ---------------- DELETE eliminar registro contable ----------------
+// ----------------  eliminar registro ----------------
 app.delete('/contabilidad/:id', async (req, res) => {
   try {
     const eliminado = await Contabilidad.findByIdAndDelete(req.params.id);
@@ -336,10 +330,10 @@ app.get('/contabilidad/gastos', async (req, res) => {
 /////////////////////////// Botes prestados ///////////////////////////
 
 const botesPrestadosSchema = new mongoose.Schema({
-  vendedorId: { type: String, required: true }, // guardamos el id como string
-  nombre: { type: String, required: true },     // nombre del vendedor
-  botesPendientes: { type: Number, required: true }, // cantidad de botes
-  fecha: { type: Date, default: Date.now }      // fecha del registro
+  vendedorId: { type: String, required: true }, 
+  nombre: { type: String, required: true },     
+  botesPendientes: { type: Number, required: true }, 
+  fecha: { type: Date, default: Date.now }      
 });
 
 
@@ -371,7 +365,7 @@ app.get("/botes-prestados", async (req, res) => {
       {
         $group: {
           _id: { vendedorId: "$vendedorId", nombre: "$nombre" },
-          botesPendientes: { $sum: "$botesPendientes" } // ya no usamos $toInt
+          botesPendientes: { $sum: "$botesPendientes" } 
         }
       },
       {
@@ -394,7 +388,7 @@ app.get("/botes-prestados", async (req, res) => {
 ////////////////////////// FACTURAAAAAAAA ///////////////////////////
 const facturaSchema = new mongoose.Schema({
   vendedor: { type: String, required: true },
-  tipo: { type: String, required: true }, // "Vendedor" o "Directa"
+  tipo: { type: String, required: true },
   fecha: { type: Date, required: true },
   productos: [
     {
@@ -404,7 +398,7 @@ const facturaSchema = new mongoose.Schema({
     }
   ],
   total: { type: Number, required: true },
-  estado: { type: String, required: true } // "Pagada" o "Pendiente"
+  estado: { type: String, required: true }
 }, { collection: "Facturas" });
 
 const Factura = mongoose.model("Factura", facturaSchema);
@@ -419,7 +413,6 @@ app.get("/facturas", async (req, res) => {
     if (estado && estado !== "Todos") filtro.estado = estado;
 
     if (fecha) {
-      // Buscar por string exacto
       filtro.fecha = { $eq: new Date(fecha) };
     }
 
@@ -454,7 +447,7 @@ app.post("/facturas/generar", async (req, res) => {
 
     const fechaStr = fecha.toString();
 
-    // Obtener movimientos del día
+    // movimientos del día
     let movimientos = await Movimiento.find({ Vendedor: vendedor, Fecha: fechaStr });
     if (!movimientos || movimientos.length === 0) {
       const parts = fechaStr.split("/").map(s => s.padStart(2, "0"));
@@ -505,7 +498,6 @@ app.post("/facturas/generar", async (req, res) => {
 
     totalBolsasCobradas = Math.max(0, totalBolsasCobradas);
 
-    // --- TRAER PRECIOS DE LA COLECCIÓN `Precios` ---
     const preciosActuales = await Precios.findOne({});
     if (!preciosActuales) {
       return res.status(500).json({ mensaje: "No hay precios configurados" });
@@ -576,10 +568,9 @@ app.get("/facturas/dia", async (req, res) => {
     const { fecha } = req.query;
     if (!fecha) return res.status(400).json({ mensaje: "Debe enviar la fecha" });
 
-    // fecha viene en formato "D/M/YYYY" o "DD/MM/YYYY"
     const [day, month, year] = fecha.split("/").map(Number);
-    const inicio = new Date(year, month - 1, day);         // 00:00 local
-    const fin = new Date(year, month - 1, day + 1);       // siguiente día 00:00 local
+    const inicio = new Date(year, month - 1, day);         
+    const fin = new Date(year, month - 1, day + 1);       
 
     const facturas = await Factura.find({
       fecha: { $gte: inicio, $lt: fin }
@@ -600,15 +591,10 @@ app.get("/facturas/preview", async (req, res) => {
     if (!vendedor || !fecha) {
       return res.status(400).json({ mensaje: "Faltan parámetros" });
     }
-
-    // Primero intenta buscar movimientos por string exacto (tu actual formato)
     let movimientos = await Movimiento.find({ Vendedor: vendedor, Fecha: fecha });
-
-    // Si no encuentra, intenta normalizar: si fecha es "D/M/YYYY" probar "DD/MM/YYYY" o ISO
     if (!movimientos || movimientos.length === 0) {
-      // intentar con ceros delante
       const parts = fecha.split("/").map(s => s.padLeft ? s.padLeft(2,'0') : s);
-      const fechaPad = parts.join("/"); // "05/12/2025" si venía "5/12/2025"
+      const fechaPad = parts.join("/"); 
       movimientos = await Movimiento.find({ Vendedor: vendedor, Fecha: fechaPad });
     }
 
@@ -668,11 +654,9 @@ app.delete("/facturas/:id", async (req, res) => {
       return res.status(404).json({ mensaje: "Factura no encontrada" });
     }
 
-    // Opcional: actualizar BotesPrestados si la factura eliminada tenía botellones pendientes
+
     const botesPrestados = await BotesPrestados.find({ vendedorId: facturaEliminada.vendedor });
     if (botesPrestados.length > 0) {
-      // Aquí podrías ajustar la cantidad de botesPendientes según lo que tenía la factura eliminada
-      // Por simplicidad, dejamos como está
     }
 
     res.status(200).json({ mensaje: "Factura eliminada correctamente", factura: facturaEliminada });
